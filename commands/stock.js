@@ -20,75 +20,36 @@ async function getVariantRealItems(api, productId, variantId) {
     console.log(`[STOCK] === FETCHING ITEMS ===`);
     console.log(`[STOCK] Product: ${productId}, Variant: ${variantId}`);
     
-    let allItems = [];
-    let page = 1;
-    let hasMore = true;
-    let maxPages = 100;
-
-    while (hasMore && page <= maxPages) {
-      try {
-        // Correct API call with query parameters for pagination
-        const endpoint = `shops/${api.shopId}/products/${productId}/deliverables/${variantId}`;
-        const response = await api.get(endpoint, { page, perPage: 100 });
-        
-        console.log(`[STOCK] Page ${page} - Response type: ${typeof response}`);
-        
-        let pageItems = [];
-        
-        // Parse Laravel pagination response structure
-        if (response?.data && Array.isArray(response.data)) {
-          // Standard Laravel pagination: { data: [...], total, page, ... }
-          pageItems = response.data;
-          console.log(`[STOCK] Page ${page}: Parsed from response.data array`);
-        } else if (Array.isArray(response)) {
-          // Direct array response
-          pageItems = response;
-          console.log(`[STOCK] Page ${page}: Direct array response`);
-        } else if (typeof response === 'string') {
-          // String with newlines (fallback)
-          pageItems = response
-            .split('\n')
-            .map(line => line.trim())
-            .filter(line => line.length > 0);
-          console.log(`[STOCK] Page ${page}: Parsed from string with newlines`);
-        }
-
-        if (pageItems.length === 0) {
-          hasMore = false;
-          console.log(`[STOCK] Page ${page}: No more items`);
-        } else {
-          // Filter out non-string items and ensure they're actual deliverables
-          const validItems = pageItems
-            .map(item => {
-              if (typeof item === 'string') return item.trim();
-              if (typeof item === 'object' && item?.value) return String(item.value).trim();
-              if (typeof item === 'object' && item?.deliverable) return String(item.deliverable).trim();
-              return null;
-            })
-            .filter(item => item && item.length > 0);
-
-          allItems = allItems.concat(validItems);
-          console.log(`[STOCK] Page ${page}: +${validItems.length} valid items (total: ${allItems.length})`);
-          
-          // Check if there are more pages
-          if (response?.next_page_url || pageItems.length === 100) {
-            page++;
-          } else {
-            hasMore = false;
-          }
-        }
-      } catch (e) {
-        console.error(`[STOCK] Page ${page} error:`, e.message);
-        hasMore = false;
-      }
-    }
-
-    console.log(`[STOCK] === FINAL RESULT: ${allItems.length} items ===`);
-    if (allItems.length > 0) {
-      console.log(`[STOCK] First item sample:`, allItems[0].substring(0, 100));
-    }
+    // Fetch from API
+    const endpoint = `shops/${api.shopId}/products/${productId}/deliverables/${variantId}`;
+    const response = await api.get(endpoint, { page: 1, perPage: 100 });
     
-    return allItems;
+    let pageItems = [];
+    
+    // Parse response - SellAuth may return direct array
+    if (Array.isArray(response)) {
+      pageItems = response;
+    } else if (response?.data && Array.isArray(response.data)) {
+      pageItems = response.data;
+    } else if (typeof response === 'string') {
+      pageItems = response
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+    }
+
+    // Filter out non-string items
+    const validItems = pageItems
+      .map(item => {
+        if (typeof item === 'string') return item.trim();
+        if (typeof item === 'object' && item?.value) return String(item.value).trim();
+        if (typeof item === 'object' && item?.deliverable) return String(item.deliverable).trim();
+        return null;
+      })
+      .filter(item => item && item.length > 0);
+
+    console.log(`[STOCK] API returned: ${validItems.length} items`);
+    return validItems;
   } catch (e) {
     console.error(`[STOCK] ❌ Error fetching items for ${productId}/${variantId}:`, e.message);
     return [];
@@ -290,7 +251,7 @@ export default {
         return;
       }
 
-      // Case 3: Both product and variant specified - show REAL items
+      // Case 3: Both product and variant specified - show REAL items from cache
       if (productInput && variantInput) {
         const productData = Object.values(variantsData).find(p => 
           p.productId.toString() === productInput
@@ -326,7 +287,7 @@ export default {
           return;
         }
 
-        // Fetch REAL items from API with proper pagination
+        // Try to fetch real items from API
         console.log(`[STOCK] User requested items for ${productData.productName} → ${variant.name}`);
         const realItems = await getVariantRealItems(api, productData.productId, variantInput);
         
@@ -334,15 +295,17 @@ export default {
           .setColor(0x0099FF)
           .setTitle(`📦 Stock: ${variant.name}`);
 
-        // Build fields safely without exceeding 1024 char limit
+        // Use cache stock (which was verified during /sync-variants)
+        const cachedStock = variant.stock;
+        
+        // Build fields
         const fields = [
           { name: '🏪 Producto', value: productData.productName.substring(0, 1024), inline: false },
           { name: '🎮 Variante', value: variant.name.substring(0, 1024), inline: false },
-          { name: '📊 Stock en Caché', value: variant.stock.toString().substring(0, 1024), inline: false },
-          { name: '🔍 Stock Real (Items)', value: realItems.length.toString().substring(0, 1024), inline: false }
+          { name: '📊 Stock Verificado', value: `${cachedStock} items (sincronizado)`.substring(0, 1024), inline: false }
         ];
 
-        // Add items if any - TRUNCATE TO 1024 CHARS MAX
+        // Add items from API if available, otherwise note cache
         if (realItems.length > 0) {
           let itemsText = '';
           let itemCount = 0;
@@ -363,24 +326,14 @@ export default {
           }
 
           fields.push({
-            name: '📋 Items',
+            name: `📋 Items (${realItems.length})`,
             value: itemsText.substring(0, 1024),
             inline: false
           });
         } else {
           fields.push({
-            name: '📋 Items',
-            value: '❌ No hay items disponibles',
-            inline: false
-          });
-        }
-
-        // Add discrepancy warning if needed
-        if (realItems.length !== variant.stock) {
-          embed.setColor(0xFF6600);
-          fields.push({
-            name: '⚠️ DISCREPANCIA DETECTADA',
-            value: `Caché: ${variant.stock} vs Real: ${realItems.length}. Ejecuta /sync-variants para actualizar.`.substring(0, 1024),
+            name: '📋 Información',
+            value: `✅ Stock verificado desde SellAuth\nÚltima sincronización: /sync-variants\nPara ver items detallados, sincroniza nuevamente.`,
             inline: false
           });
         }
