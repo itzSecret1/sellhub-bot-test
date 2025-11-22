@@ -86,11 +86,12 @@ export default {
               
               // Debug samples from first 2 pages
               if (page <= 2 && i < 3) {
-                debugSamples.push(`  Page ${page} Invoice ${i}: id="${inv.id}" (${typeof inv.id}), invoice_id="${inv.invoice_id}", reference_id="${inv.reference_id}"`);
+                debugSamples.push(`  Page ${page} Invoice ${i}: id="${inv.id}", unique_id="${inv.unique_id}", invoice_id="${inv.invoice_id}"`);
               }
 
               // Check all possible ID field combinations
               const idMatch = inv.id === cleanId || 
+                              inv.unique_id === cleanId ||  // ← CRITICAL: This is the format user provides
                               inv.invoice_id === cleanId || 
                               inv.reference_id === cleanId ||
                               (inv.id && inv.id.toString() === cleanId) ||
@@ -100,7 +101,7 @@ export default {
                 invoiceData = inv;
                 foundOnPage = true;
                 console.log(`[INVOICE-VIEW] ✅ FOUND Invoice on page ${page}!`);
-                console.log(`[INVOICE-VIEW] ✅ Matched ID field: id=${inv.id}, invoice_id=${inv.invoice_id}, reference_id=${inv.reference_id}`);
+                console.log(`[INVOICE-VIEW] ✅ Matched field: unique_id="${inv.unique_id}" (Primary Match)`);
                 break;
               }
             }
