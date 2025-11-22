@@ -43,13 +43,16 @@ export default {
         await interaction.editReply({ content: message }).catch(() => {});
       }, 2000);
 
-      // Process each product
+      // Process each product - DETECT ALL, not just those with variants
       for (const product of productList) {
         try {
+          let hasVariants = false;
+          const variantMap = {};
+
           // Check if product has variants array
           if (product.variants && Array.isArray(product.variants) && product.variants.length > 0) {
-            const variantMap = {};
-
+            hasVariants = true;
+            
             for (const variant of product.variants) {
               const stock = variant.stock || 0;
               variantMap[variant.id.toString()] = {
@@ -64,7 +67,7 @@ export default {
                 stock: stock
               });
 
-              if (stock > 0) totalVariants++;
+              totalVariants++;
             }
 
             allVariants[product.id.toString()] = {
@@ -90,28 +93,30 @@ export default {
       const totalTime = Math.round((Date.now() - startTime) / 1000);
 
       console.log(`[SYNC] Complete! ${totalVariants} variants in ${productsWithVariants} products`);
+      console.log(`[SYNC] Total products scanned: ${productList.length}`);
       console.log(`[SYNC] Variants detected:`, variantsList.slice(0, 10));
 
       // Create detailed report message
       let reportText = `✅ **¡Sincronización Completada!**\n\n`;
       reportText += `**📊 Estadísticas:**\n`;
+      reportText += `• Productos totales: ${productList.length}\n`;
       reportText += `• Productos con variantes: ${productsWithVariants}\n`;
-      reportText += `• Variantes con stock: ${totalVariants}\n`;
+      reportText += `• Variantes totales: ${totalVariants}\n`;
       reportText += `• Tiempo total: ${Math.floor(totalTime / 60)}m ${totalTime % 60}s\n\n`;
-      reportText += `**🎮 Variantes Detectadas (primeras 20):**\n`;
+      reportText += `**🎮 Variantes Detectadas (primeras 25):**\n`;
 
-      // Add first 20 variants
-      for (let i = 0; i < Math.min(20, variantsList.length); i++) {
+      // Add first 25 variants
+      for (let i = 0; i < Math.min(25, variantsList.length); i++) {
         const v = variantsList[i];
         const stockEmoji = v.stock > 0 ? '✅' : '❌';
         reportText += `${stockEmoji} ${v.productName} → ${v.variantName} (${v.stock})\n`;
       }
 
-      if (variantsList.length > 20) {
-        reportText += `\n... y ${variantsList.length - 20} variantes más\n`;
+      if (variantsList.length > 25) {
+        reportText += `\n... y ${variantsList.length - 25} variantes más\n`;
       }
 
-      reportText += `\n💾 Datos guardados. Usa **/replace** para empezar.`;
+      reportText += `\n💾 Datos guardados. Usa **/stock** para verificar.`;
 
       const embed = new EmbedBuilder()
         .setColor('#00ff00')
@@ -123,7 +128,7 @@ export default {
     } catch (error) {
       console.error('Sync error:', error);
       await interaction.editReply({ 
-        content: `❌ Error: ${error.message}` 
+        content: `❌ Error en sincronización: ${error.message}` 
       });
     }
   }
