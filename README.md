@@ -1,47 +1,66 @@
 # SellAuth Discord Bot
 
-This Discord bot is designed to help you manage your SellAuth shop directly from Discord. It includes commands for managing products, checking orders, and other administrative functions for your SellAuth store.
+A Discord bot for managing SellAuth e-commerce shops with product variants, stock management, and role-based access control.
 
-## Getting Started
+## Features
+- Slash command system with role-based permissions
+- Product and variant management
+- Stock management (/replace, /unreplace, /add-stock, /delete-stock)
+- Invoice viewing and processing
+- Coupon management
+- Automatic SellAuth synchronization
 
-To get started with the bot, clone the repository and create a `.env` file by copying `.env.example`:
+## Setup
 
-`cp .env.example .env`
+### 1. Environment Variables
+Copy `.env.example` to `.env` and fill in your values:
+```
+BOT_TOKEN=your_discord_bot_token
+BOT_GUILD_ID=your_guild_id
+BOT_ADMIN_ROLE_ID=1440390894430982224
+BOT_STAFF_ROLE_ID=1440390892900061336
+BOT_CUSTOMER_ROLE_ID=your_customer_role_id
+BOT_USER_ID_WHITELIST=user_ids_comma_separated
+SA_API_KEY=your_sellauth_api_key
+SA_SHOP_ID=112723
+```
 
-Then fill in the variables as shown below:
+### 2. Install Dependencies
+```bash
+npm install
+```
 
-- `BOT_TOKEN:` Your Discord bot token, which authenticates the bot with Discord.
-- `BOT_GUILD_ID:` The ID of the Discord server (guild) where the bot will operate.
-- `BOT_USER_ID_WHITELIST:` A comma-separated list of user IDs allowed to use restricted commands (commands with the `onlyWhitelist: true` property). This restriction currently applies to all commands except "help", "ping", and "stats".
-- `BOT_CUSTOMER_ROLE_ID:` The ID of the Discord role that will be assigned to customers who use the `claim` command.
-- `SA_API_KEY:` Your SellAuth API key, available at your SellAuth dashboard under [Account -> API Access](https://dash.sellauth.com/api). If it’s not visible, click "Regenerate".
-- `SA_SHOP_ID:` Your SellAuth shop ID, available at your SellAuth dashboard under [Account -> API Access](https://dash.sellauth.com/api).
+### 3. Run the Bot
+```bash
+npm start
+```
 
-## Installation
+## Deployment on Railway
 
-Make sure you have Node.js installed, then install the required packages:
+1. Go to [Railway.app](https://railway.app)
+2. Create new project → GitHub Repository → select `sell-auth-bot-test`
+3. Add environment variables in Railway:
+   - BOT_TOKEN
+   - BOT_GUILD_ID
+   - BOT_ADMIN_ROLE_ID
+   - BOT_STAFF_ROLE_ID
+   - BOT_CUSTOMER_ROLE_ID
+   - BOT_USER_ID_WHITELIST
+   - SA_API_KEY
+   - SA_SHOP_ID
+4. Click Deploy
 
-`npm install`
+Your bot will run 24/7 on Railway!
 
-Running the Bot
+## Role Permissions
 
-To start the bot, run:
+- **Owner (BOT_ADMIN_ROLE_ID)**: Full access to all commands
+- **Staff (BOT_STAFF_ROLE_ID)**: Limited access (/help, /replace, /unreplace, /invoice-view)
 
-`node index.js`
+## Architecture
 
-## Development Guidelines
-
-### Contributions
-We welcome contributions of new commands or features! Please ensure that any changes maintain code quality and respect the basic structure of the bot.
-
-### Formatting
-Before committing, run `npm run format` to auto-format the code.
-
-## Community & Support
-
-For help, inquiries, or to join the community, visit the [SellAuth Discord server](https://discord.sellauth.com).
-
-Happy coding!
-
-## License
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+The bot uses:
+- **Discord.js v14** for Discord API integration
+- **SellAuth REST API** for shop management
+- **Automatic variant sync** every second
+- **GitHub auto-sync** for continuous code updates
