@@ -34,28 +34,33 @@ export class Bot {
     this.client.on('warn', (info) => console.log(info));
     this.client.on('error', (error) => {
       console.error('[BOT ERROR]', error.message);
-      if (error.message && error.message.includes('Not enough sessions')) {
-        console.warn('[BOT] Discord session limit reached. Retrying in 30 seconds...');
-        setTimeout(() => this.loginWithRetry(), 30000);
-      }
     });
 
     this.onInteractionCreate();
   }
 
   async loginWithRetry(attempt = 1) {
-    const maxAttempts = 5;
     try {
-      console.log(`[BOT LOGIN] Attempt ${attempt}/${maxAttempts}`);
+      console.log(`[BOT LOGIN] Connecting to Discord...`);
       await this.client.login(config.BOT_TOKEN);
     } catch (error) {
-      console.error(`[BOT LOGIN ERROR] ${error.message}`);
-      if (attempt < maxAttempts && error.message && error.message.includes('Not enough sessions')) {
-        const delay = Math.min(30000 * attempt, 120000); // Max 2 minutes
-        console.log(`[BOT LOGIN] Retrying in ${delay / 1000} seconds...`);
-        setTimeout(() => this.loginWithRetry(attempt + 1), delay);
-      } else if (attempt >= maxAttempts) {
-        console.error(`[BOT LOGIN] Max retries reached. Please check Discord API status or wait for session reset.`);
+      if (error.message && error.message.includes('Not enough sessions')) {
+        // Extract reset time from error message
+        const resetMatch = error.message.match(/resets at ([^;]+)/);
+        const resetTime = resetMatch ? resetMatch[1] : 'unknown';
+        
+        console.error(`\n❌ [BOT LOGIN] Discord session limit reached`);
+        console.error(`   Session reset: ${resetTime}`);
+        console.error(`   Reason: Too many connection attempts in short time`);
+        console.error(`   Solution: Wait for Discord to reset sessions (usually within 1 hour)\n`);
+        
+        // Only retry once after 5 minutes to avoid making it worse
+        if (attempt === 1) {
+          console.log(`[BOT LOGIN] Will retry in 5 minutes...`);
+          setTimeout(() => this.loginWithRetry(2), 5 * 60 * 1000);
+        }
+      } else {
+        console.error(`[BOT LOGIN ERROR] ${error.message}`);
       }
     }
   }
