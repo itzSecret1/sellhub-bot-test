@@ -203,6 +203,7 @@ export default {
 
         const removedItems = deliverablesArray.splice(0, quantity);
         const newDeliverablesString = deliverablesArray.join('\n');
+        const remainingStock = deliverablesArray.length;
 
         try {
           await api.put(
@@ -214,6 +215,13 @@ export default {
             content: `❌ Error actualizando stock: ${updateError.message}` 
           });
           return;
+        }
+
+        // Update cache with new stock
+        const variantsData = loadVariantsData();
+        if (variantsData[product.id.toString()]?.variants[variant.id.toString()]) {
+          variantsData[product.id.toString()].variants[variant.id.toString()].stock = remainingStock;
+          writeFileSync(variantsDataPath, JSON.stringify(variantsData, null, 2));
         }
 
         addToHistory(product.id, product.name, removedItems, variant.id, variant.name);
