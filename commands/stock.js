@@ -158,16 +158,20 @@ export default {
             .setColor(0x0099FF)
             .setTitle(`📦 ${productData.productName}`);
 
-          const variantsList = Object.values(productData.variants || {})
-            .map(v => `• **${v.name}**: ${v.stock} items`)
-            .join('\n');
-
-          if (variantsList) {
-            embed.setDescription(variantsList || 'No variants');
-          } else {
-            embed.setDescription('No variants');
+          const variants = Object.values(productData.variants || {});
+          let description = '';
+          
+          for (const v of variants) {
+            const line = `• **${v.name}**: ${v.stock} items\n`;
+            // Discord field limit: 1024 chars
+            if ((description + line).length <= 1024) {
+              description += line;
+            } else {
+              break;
+            }
           }
 
+          embed.setDescription(description || 'No variants');
           embeds.push(embed);
         });
 
@@ -223,11 +227,19 @@ export default {
           .setColor(0x0099FF)
           .setTitle(`📦 Stock: ${productData.productName}`);
 
-        const variantsList = Object.values(productData.variants || {})
-          .map(v => `• **${v.name}**: ${v.stock} items`)
-          .join('\n');
+        const variants = Object.values(productData.variants || {});
+        let description = '';
+        
+        for (const v of variants) {
+          const line = `• **${v.name}**: ${v.stock} items\n`;
+          if ((description + line).length <= 1024) {
+            description += line;
+          } else {
+            break;
+          }
+        }
 
-        embed.setDescription(variantsList || 'No hay variantes');
+        embed.setDescription(description || 'No hay variantes');
 
         if (interaction.deferred || interaction.replied) {
           await interaction.editReply({ embeds: [embed] }).catch(() => {});
@@ -278,57 +290,83 @@ export default {
         
         const embed = new EmbedBuilder()
           .setColor(0x0099FF)
-          .setTitle(`📦 Stock Detallado`)
-          .addFields(
-            { name: '🏪 Producto', value: productData.productName, inline: false },
-            { name: '🎮 Variante', value: variant.name, inline: false },
-            { name: '📊 Stock Reportado', value: `**${variant.stock}** items`, inline: false },
-            { name: '🔍 Stock Real (Items)', value: `**${realItems.length}** items`, inline: false }
-          );
+          .setTitle(`📦 Stock: ${variant.name}`);
 
-        // Add items if any
+        // Build fields safely without exceeding 1024 char limit
+        const fields = [
+          { name: '🏪 Producto', value: productData.productName.substring(0, 1024), inline: false },
+          { name: '🎮 Variante', value: variant.name.substring(0, 1024), inline: false },
+          { name: '📊 Stock Reportado', value: variant.stock.toString().substring(0, 1024), inline: false },
+          { name: '🔍 Stock Real (Items)', value: realItems.length.toString().substring(0, 1024), inline: false }
+        ];
+
+        // Add items if any - TRUNCATE TO 1024 CHARS MAX
         if (realItems.length > 0) {
           let itemsText = '';
+          let itemCount = 0;
           
-          // Show items grouped in chunks
-          for (let i = 0; i < Math.min(20, realItems.length); i++) {
-            itemsText += `${i + 1}. ${realItems[i]}\n`;
+          // Build items string respecting 1024 char limit
+          for (let i = 0; i < realItems.length; i++) {
+            const itemLine = `${i + 1}. ${realItems[i]}\n`;
+            if ((itemsText + itemLine).length <= 1000) {
+              itemsText += itemLine;
+              itemCount++;
+            } else {
+              break;
+            }
           }
 
-          if (realItems.length > 20) {
-            itemsText += `\n... y ${realItems.length - 20} items más`;
+          if (realItems.length > itemCount) {
+            itemsText += `\n... y ${realItems.length - itemCount} items más`;
           }
 
-          embed.addFields({ 
-            name: '📋 Items (primeros)', 
-            value: itemsText || 'Sin items', 
-            inline: false 
-          });
-        }
-
-        // Discrepancy warning
-        if (realItems.length !== variant.stock) {
-          embed.setColor(0xFF6600);
-          embed.addFields({
-            name: '⚠️ DISCREPANCIA DETECTADA',
-            value: `Cache: ${variant.stock} vs Real: ${realItems.length}. Ejecuta /sync-variants para actualizar.`,
+          fields.push({
+            name: '📋 Items',
+            value: itemsText.substring(0, 1024),
             inline: false
           });
         }
 
+        // Add discrepancy warning if needed
+        if (realItems.length !== variant.stock) {
+          embed.setColor(0xFF6600);
+          fields.push({
+            name: '⚠️ DISCREPANCIA DETECTADA',
+            value: `Cache: ${variant.stock} vs Real: ${realItems.length}. Ejecuta /sync-variants para actualizar.`.substring(0, 1024),
+            inline: false
+          });
+        }
+
+        // Add fields (max 25 fields per embed)
+        if (fields.length > 25) {
+          fields.length = 25;
+        }
+        embed.addFields(fields);
+
         if (interaction.deferred || interaction.replied) {
-          await interaction.editReply({ embeds: [embed] }).catch(() => {});
+          await interaction.editReply({ embeds: [embed] }).catch((e) => {
+            console.error('[STOCK] EditReply error:', e.message);
+          });
         } else {
-          await interaction.reply({ embeds: [embed], ephemeral: true }).catch(() => {});
+          await interaction.reply({ embeds: [embed], ephemeral: true }).catch((e) => {
+            console.error('[STOCK] Reply error:', e.message);
+          });
         }
         return;
       }
 
     } catch (error) {
       console.error('[STOCK] Error:', error);
-      await interaction.editReply({ 
-        content: `❌ Error: ${error.message}` 
-      }).catch(() => {});
+      if (interaction.deferred || interaction.replied) {
+        await interaction.editReply({ 
+          content: `❌ Error: ${error.message}` 
+        }).catch(() => {});
+      } else {
+        await interaction.reply({
+          content: `❌ Error: ${error.message}`,
+          ephemeral: true
+        }).catch(() => {});
+      }
     }
   }
 };
