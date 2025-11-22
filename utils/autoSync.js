@@ -3,52 +3,101 @@ import { join } from 'path';
 
 const variantsDataPath = join(process.cwd(), 'variantsData.json');
 
-async function getRealStockFromDeliverables(api, productId, variantId) {
+// Simple sleep function
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+async function getRealStockFromDeliverables(api, productId, variantId, delayMs = 1000) {
   try {
-    const deliverablesData = await api.get(
-      `shops/${api.shopId}/products/${productId}/deliverables/${variantId}`
+    // Wait to respect rate limits (1 request per minute minimum)
+    await sleep(delayMs);
+    
+    const response = await api.get(
+      `shops/${api.shopId}/products/${productId}/deliverables/${variantId}`,
+      { page: 1, perPage: 1 }  // Only need count, not full items
     );
     
-    let items = [];
+    let items = 0;
     
-    if (typeof deliverablesData === 'string') {
-      items = deliverablesData.split('\n').filter(item => item.trim());
-    } else if (deliverablesData?.deliverables && typeof deliverablesData.deliverables === 'string') {
-      items = deliverablesData.deliverables.split('\n').filter(item => item.trim());
-    } else if (Array.isArray(deliverablesData)) {
-      items = deliverablesData.filter(item => item && item.trim?.());
+    // Parse Laravel pagination response
+    if (response?.data && Array.isArray(response.data)) {
+      items = response.data.length;
+    } else if (response?.total && typeof response.total === 'number') {
+      items = response.total;
+    } else if (typeof response === 'string') {
+      items = response.split('\n').filter(item => item.trim()).length;
+    } else if (Array.isArray(response)) {
+      items = response.length;
     }
     
-    return items.length;
+    return items;
   } catch (e) {
+    console.error(`[AUTO-SYNC] Error fetching stock for ${productId}/${variantId}:`, e.message);
     return 0;
   }
 }
 
-// Limit concurrent promises to avoid overwhelming the API
-async function batchPromises(promises, batchSize = 5) {
+// Sequential processing to avoid rate limit (one at a time)
+async function sequentialFetchStocks(api, allVariantsToFetch) {
   const results = [];
-  for (let i = 0; i < promises.length; i += batchSize) {
-    const batch = promises.slice(i, i + batchSize);
-    const batchResults = await Promise.all(batch);
-    results.push(...batchResults);
+  
+  for (let i = 0; i < allVariantsToFetch.length; i++) {
+    const { product, variant } = allVariantsToFetch[i];
+    
+    // Delay between requests (60+ seconds to respect rate limit)
+    // But on first request, no delay
+    const delayMs = i === 0 ? 500 : 60000;
+    
+    const stock = await getRealStockFromDeliverables(api, product.id, variant.id, delayMs);
+    results.push({ productId: product.id, variantId: variant.id, stock });
+    
+    // Show progress
+    if ((i + 1) % 10 === 0) {
+      console.log(`[AUTO-SYNC] Fetched ${i + 1}/${allVariantsToFetch.length} stocks...`);
+    }
   }
+  
   return results;
 }
 
 async function autoSyncVariants(api) {
   try {
+    const startTime = Date.now();
     const allVariants = {};
     let totalVariants = 0;
     let productsWithVariants = 0;
 
-    // Get all products
-    const products = await api.get(`shops/${api.shopId}/products`);
-    const productList = Array.isArray(products) ? products : (products?.data || []);
+    console.log('[AUTO-SYNC] Starting full sync with proper rate limit handling...');
 
-    // Collect all variants across all products
+    // Get all products (with pagination)
+    let allProducts = [];
+    let page = 1;
+    let hasMore = true;
+    
+    while (hasMore && page <= 50) {
+      try {
+        const response = await api.get(`shops/${api.shopId}/products`, { page, perPage: 100 });
+        const products = Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []);
+        
+        if (products.length === 0) {
+          hasMore = false;
+        } else {
+          allProducts = allProducts.concat(products);
+          console.log(`[AUTO-SYNC] Loaded products page ${page}: +${products.length} (total: ${allProducts.length})`);
+          page++;
+        }
+      } catch (e) {
+        console.error(`[AUTO-SYNC] Error fetching products page ${page}:`, e.message);
+        hasMore = false;
+      }
+    }
+
+    console.log(`[AUTO-SYNC] Total products loaded: ${allProducts.length}`);
+
+    // Collect all variants to fetch
     const allVariantsToFetch = [];
-    for (const product of productList) {
+    for (const product of allProducts) {
       if (product.variants && Array.isArray(product.variants) && product.variants.length > 0) {
         for (const variant of product.variants) {
           allVariantsToFetch.push({ product, variant });
@@ -56,52 +105,51 @@ async function autoSyncVariants(api) {
       }
     }
 
-    // Fetch stock in batches (max 5 concurrent requests)
-    const stockPromises = allVariantsToFetch.map(({ product, variant }) =>
-      getRealStockFromDeliverables(api, product.id, variant.id)
-        .then(stock => ({ productId: product.id, variantId: variant.id, stock }))
-        .catch(() => ({ productId: product.id, variantId: variant.id, stock: 0 }))
-    );
+    console.log(`[AUTO-SYNC] Total variants to fetch: ${allVariantsToFetch.length}`);
 
-    const stockResults = await batchPromises(stockPromises, 5);
-    const stockMap = new Map(stockResults.map(r => [`${r.productId}-${r.variantId}`, r.stock]));
+    // Fetch stock sequentially to avoid rate limits
+    if (allVariantsToFetch.length > 0) {
+      const stockResults = await sequentialFetchStocks(api, allVariantsToFetch);
+      const stockMap = new Map(stockResults.map(r => [`${r.productId}-${r.variantId}`, r.stock]));
 
-    // Build variants data with fetched stock
-    for (const product of productList) {
-      try {
-        if (product.variants && Array.isArray(product.variants) && product.variants.length > 0) {
-          const variantMap = {};
+      // Build variants data
+      for (const product of allProducts) {
+        try {
+          if (product.variants && Array.isArray(product.variants) && product.variants.length > 0) {
+            const variantMap = {};
 
-          for (const variant of product.variants) {
-            const realStock = stockMap.get(`${product.id}-${variant.id}`) || 0;
-            
-            variantMap[variant.id.toString()] = {
-              id: variant.id,
-              name: variant.name,
-              stock: realStock
+            for (const variant of product.variants) {
+              const realStock = stockMap.get(`${product.id}-${variant.id}`) || 0;
+              
+              variantMap[variant.id.toString()] = {
+                id: variant.id,
+                name: variant.name,
+                stock: realStock
+              };
+              
+              totalVariants++;
+            }
+
+            allVariants[product.id.toString()] = {
+              productId: product.id,
+              productName: product.name,
+              variants: variantMap
             };
-            
-            if (realStock > 0) totalVariants++;
+
+            productsWithVariants++;
           }
-
-          allVariants[product.id.toString()] = {
-            productId: product.id,
-            productName: product.name,
-            variants: variantMap
-          };
-
-          productsWithVariants++;
+        } catch (e) {
+          console.error(`[AUTO-SYNC] Error processing product ${product.id}:`, e.message);
         }
-      } catch (e) {
-        // Silently continue on product errors
       }
     }
 
     // Save to file
     writeFileSync(variantsDataPath, JSON.stringify(allVariants, null, 2));
     
+    const duration = Math.round((Date.now() - startTime) / 1000);
     const timestamp = new Date().toLocaleTimeString();
-    console.log(`[AUTO-SYNC] ${timestamp} - Updated ${productsWithVariants} products with ${totalVariants} variants`);
+    console.log(`[AUTO-SYNC] ${timestamp} - Completed! ${productsWithVariants} products, ${totalVariants} variants (${duration}s)`);
 
   } catch (error) {
     const timestamp = new Date().toLocaleTimeString();
@@ -118,18 +166,13 @@ export function startAutoSync(api) {
       const cached = JSON.parse(readFileSync(variantsDataPath, 'utf-8'));
       if (Object.keys(cached).length > 0) {
         hasCachedData = true;
-        console.log('[AUTO-SYNC] Using cached variants data');
+        console.log('[AUTO-SYNC] ✅ Using cached variants data');
       }
     } catch (e) {
-      console.log('[AUTO-SYNC] Cache error, will regenerate on first sync');
+      console.log('[AUTO-SYNC] Cache error, will use empty');
     }
   }
 
-  console.log('[AUTO-SYNC] Ready - use /sync-variants command to update (manual sync only)');
-  
-  // Only run first sync if NO cached data exists (on first startup)
-  if (!hasCachedData) {
-    console.log('[AUTO-SYNC] No cache found - running initial sync...');
-    autoSyncVariants(api).catch(err => console.error('[AUTO-SYNC] Initial sync error:', err.message));
-  }
+  console.log('[AUTO-SYNC] Ready - use /sync-variants command to update');
+  console.log('[AUTO-SYNC] ⚠️  Rate limit: 1 request/minute. Use manual /sync-variants for full sync.');
 }
