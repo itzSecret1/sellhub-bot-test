@@ -1,9 +1,12 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { loadVariantsData } from '../utils/dataLoader.js';
+import { parseDeliverables } from '../utils/parseDeliverables.js';
+import { ErrorLog } from '../utils/errorLogger.js';
+import { CommandLogger } from '../utils/commandLogger.js';
 
 const historyFilePath = join(process.cwd(), 'replaceHistory.json');
-const variantsDataPath = join(process.cwd(), 'variantsData.json');
 
 let historyData = [];
 
@@ -15,26 +18,17 @@ function saveHistory() {
   writeFileSync(historyFilePath, JSON.stringify(historyData, null, 2));
 }
 
-function loadVariantsData() {
-  if (existsSync(variantsDataPath)) {
-    try {
-      return JSON.parse(readFileSync(variantsDataPath, 'utf-8'));
-    } catch (e) {
-      return {};
-    }
-  }
-  return {};
-}
-
 export default {
   data: new SlashCommandBuilder()
     .setName('unreplace')
     .setDescription('Restore the last item(s) removed from stock')
-    .addIntegerOption(option => 
-      option.setName('count')
+    .addIntegerOption((option) =>
+      option
+        .setName('count')
         .setDescription('Number of recent removals to restore (default: 1)')
         .setRequired(false)
-        .setMinValue(1)),
+        .setMinValue(1)
+    ),
 
   onlyWhitelisted: true,
   requiredRole: 'staff',
@@ -43,6 +37,7 @@ export default {
     const count = interaction.options.getInteger('count') || 1;
 
     try {
+      await CommandLogger.logCommand(interaction, 'unreplace');
       try {
         await interaction.deferReply({ ephemeral: true });
       } catch (deferError) {
@@ -55,15 +50,15 @@ export default {
       }
 
       if (historyData.length === 0) {
-        await interaction.editReply({ 
-          content: `❌ No se encontró historial de reemplazos. Nada que restaurar.` 
+        await interaction.editReply({
+          content: `❌ No se encontró historial de reemplazos. Nada que restaurar.`
         });
         return;
       }
 
       if (count > historyData.length) {
-        await interaction.editReply({ 
-          content: `❌ Solo hay ${historyData.length} reemplazo(s) en el historial. No se pueden restaurar ${count}.` 
+        await interaction.editReply({
+          content: `❌ Solo hay ${historyData.length} reemplazo(s) en el historial. No se pueden restaurar ${count}.`
         });
         return;
       }
@@ -83,39 +78,18 @@ export default {
           const endpoint = `shops/${api.shopId}/products/${productId}/deliverables/${variantId}`;
 
           let deliverablesData = await api.get(endpoint);
-          let deliverablesArray = [];
-          
-          if (typeof deliverablesData === 'string') {
-            deliverablesArray = deliverablesData.split('\n').filter(item => item.trim());
-          } else if (deliverablesData?.deliverables && typeof deliverablesData.deliverables === 'string') {
-            deliverablesArray = deliverablesData.deliverables.split('\n').filter(item => item.trim());
-          } else if (deliverablesData?.content && typeof deliverablesData.content === 'string') {
-            deliverablesArray = deliverablesData.content.split('\n').filter(item => item.trim());
-          } else if (Array.isArray(deliverablesData)) {
-            deliverablesArray = deliverablesData.map(item => {
-              if (typeof item === 'string') return item.trim();
-              if (typeof item === 'object' && item?.value) return item.value;
-              return String(item).trim();
-            }).filter(item => item);
-          } else if (deliverablesData?.items && Array.isArray(deliverablesData.items)) {
-            deliverablesArray = deliverablesData.items.map(item => {
-              if (typeof item === 'string') return item.trim();
-              if (typeof item === 'object' && item?.value) return item.value;
-              return String(item).trim();
-            }).filter(item => item);
-          }
+          const deliverablesArray = parseDeliverables(deliverablesData);
 
           // Restore the actual removed items
           const restoredArray = [...removedItems, ...deliverablesArray];
           const newDeliverablesString = restoredArray.join('\n');
           const newStock = restoredArray.length;
-          
+
           // Update API
           try {
-            await api.put(
-              `shops/${api.shopId}/products/${productId}/deliverables/overwrite/${variantId}`,
-              { deliverables: newDeliverablesString }
-            );
+            await api.put(`shops/${api.shopId}/products/${productId}/deliverables/overwrite/${variantId}`, {
+              deliverables: newDeliverablesString
+            });
             console.log(`[UNREPLACE] API updated: ${productId}/${variantId}`);
           } catch (putError) {
             console.error(`[UNREPLACE] API PUT failed: ${putError.message}`);
@@ -124,6 +98,7 @@ export default {
 
           // Update cache ONLY after successful API update
           try {
+            const variantsDataPath = join(process.cwd(), 'variantsData.json');
             const variantsData = loadVariantsData();
             if (variantsData[productId.toString()]?.variants[variantId.toString()]) {
               variantsData[productId.toString()].variants[variantId.toString()].stock = newStock;
@@ -142,8 +117,16 @@ export default {
           totalItemsRestored += removedItems.length;
         } catch (error) {
           console.error(`[UNREPLACE] Error restoring item:`, error);
-          await interaction.editReply({ 
-            content: `❌ Error restaurando: ${error.message || 'Error desconocido'}` 
+          ErrorLog.log('unreplace', error, {
+            stage: 'RESTORE_ITEM',
+            productId,
+            variantId,
+            itemIndex: toRestore.indexOf(replacement),
+            userId: interaction.user.id,
+            userName: interaction.user.username
+          });
+          await interaction.editReply({
+            content: `❌ Error restaurando: ${error.message || 'Error desconocido'}`
           });
           return;
         }
@@ -157,14 +140,26 @@ export default {
       });
 
       await interaction.editReply({ content: responseMsg });
+      console.log(`[UNREPLACE] ✅ SUCCESS: Restored ${totalItemsRestored} items`);
     } catch (error) {
       console.error('[UNREPLACE] Error:', error);
+      ErrorLog.log('unreplace', error, {
+        stage: 'OUTER_EXCEPTION',
+        count,
+        userId: interaction.user.id,
+        userName: interaction.user.username
+      });
       try {
-        await interaction.editReply({ 
-          content: `❌ Error: ${error.message || 'Error desconocido'}` 
+        await interaction.editReply({
+          content: `❌ Error: ${error.message || 'Error desconocido'}`
         });
       } catch (e) {
         console.error('[UNREPLACE] Could not send error message:', e.message);
+        ErrorLog.log('unreplace', e, {
+          stage: 'REPLY_FAILURE',
+          userId: interaction.user.id,
+          userName: interaction.user.username
+        });
       }
     }
   }
