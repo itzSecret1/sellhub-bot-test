@@ -125,13 +125,13 @@ export function startAutoSync(api) {
     }
   }
 
-  console.log('[AUTO-SYNC] Ready - use /sync-variants command to update (respects API rate limits)');
+  console.log('[AUTO-SYNC] Started - syncing every 1 second');
   
-  // Only run first sync if NO cached data exists
-  if (!hasCachedData) {
-    console.log('[AUTO-SYNC] No cache found - running initial sync...');
-    setImmediate(() => {
-      autoSyncVariants(api).catch(err => console.error('[AUTO-SYNC] Initial sync error:', err.message));
-    });
-  }
+  // Run first sync immediately
+  autoSyncVariants(api).catch(err => console.error('[AUTO-SYNC] Initial sync error:', err.message));
+
+  // Run sync every 1 second
+  setInterval(() => {
+    autoSyncVariants(api).catch(err => console.error('[AUTO-SYNC] Sync error:', err.message));
+  }, 1000);
 }
