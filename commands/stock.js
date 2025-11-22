@@ -139,7 +139,10 @@ export default {
 
   async execute(interaction, api) {
     try {
-      await interaction.deferReply({ ephemeral: true });
+      // Quick response to prevent timeout
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply({ ephemeral: true }).catch(() => {});
+      }
 
       const productInput = interaction.options.getString('product');
       const variantInput = interaction.options.getString('variant');
@@ -169,14 +172,25 @@ export default {
         });
 
         if (embeds.length === 0) {
-          await interaction.editReply({
-            content: `❌ No hay datos de stock. Ejecuta /sync-variants primero.`
-          });
+          if (interaction.deferred || interaction.replied) {
+            await interaction.editReply({
+              content: `❌ No hay datos de stock. Ejecuta /sync-variants primero.`
+            }).catch(() => {});
+          } else {
+            await interaction.reply({
+              content: `❌ No hay datos de stock. Ejecuta /sync-variants primero.`,
+              ephemeral: true
+            }).catch(() => {});
+          }
           return;
         }
 
         const firstBatch = embeds.slice(0, 10);
-        await interaction.editReply({ embeds: firstBatch });
+        if (interaction.deferred || interaction.replied) {
+          await interaction.editReply({ embeds: firstBatch }).catch(() => {});
+        } else {
+          await interaction.reply({ embeds: firstBatch, ephemeral: true }).catch(() => {});
+        }
 
         for (let i = 10; i < embeds.length; i += 10) {
           const batch = embeds.slice(i, i + 10);
@@ -192,9 +206,16 @@ export default {
         );
 
         if (!productData) {
-          await interaction.editReply({
-            content: `❌ Producto no encontrado.`
-          });
+          if (interaction.deferred || interaction.replied) {
+            await interaction.editReply({
+              content: `❌ Producto no encontrado.`
+            }).catch(() => {});
+          } else {
+            await interaction.reply({
+              content: `❌ Producto no encontrado.`,
+              ephemeral: true
+            }).catch(() => {});
+          }
           return;
         }
 
@@ -208,7 +229,11 @@ export default {
 
         embed.setDescription(variantsList || 'No hay variantes');
 
-        await interaction.editReply({ embeds: [embed] });
+        if (interaction.deferred || interaction.replied) {
+          await interaction.editReply({ embeds: [embed] }).catch(() => {});
+        } else {
+          await interaction.reply({ embeds: [embed], ephemeral: true }).catch(() => {});
+        }
         return;
       }
 
@@ -219,18 +244,32 @@ export default {
         );
 
         if (!productData) {
-          await interaction.editReply({
-            content: `❌ Producto no encontrado.`
-          });
+          if (interaction.deferred || interaction.replied) {
+            await interaction.editReply({
+              content: `❌ Producto no encontrado.`
+            }).catch(() => {});
+          } else {
+            await interaction.reply({
+              content: `❌ Producto no encontrado.`,
+              ephemeral: true
+            }).catch(() => {});
+          }
           return;
         }
 
         const variant = productData.variants?.[variantInput];
 
         if (!variant) {
-          await interaction.editReply({
-            content: `❌ Variante no encontrada.`
-          });
+          if (interaction.deferred || interaction.replied) {
+            await interaction.editReply({
+              content: `❌ Variante no encontrada.`
+            }).catch(() => {});
+          } else {
+            await interaction.reply({
+              content: `❌ Variante no encontrada.`,
+              ephemeral: true
+            }).catch(() => {});
+          }
           return;
         }
 
@@ -277,7 +316,11 @@ export default {
           });
         }
 
-        await interaction.editReply({ embeds: [embed] });
+        if (interaction.deferred || interaction.replied) {
+          await interaction.editReply({ embeds: [embed] }).catch(() => {});
+        } else {
+          await interaction.reply({ embeds: [embed], ephemeral: true }).catch(() => {});
+        }
         return;
       }
 
