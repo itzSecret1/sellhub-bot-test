@@ -64,7 +64,7 @@ async function autoSyncVariants(api) {
     );
 
     const stockResults = await batchPromises(stockPromises, 5);
-    const stockMap = new Map(stockResults.map(r => (`${r.productId}-${r.variantId}`, r.stock)));
+    const stockMap = new Map(stockResults.map(r => [`${r.productId}-${r.variantId}`, r.stock]));
 
     // Build variants data with fetched stock
     for (const product of productList) {
