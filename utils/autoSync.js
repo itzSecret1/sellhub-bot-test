@@ -110,22 +110,28 @@ async function autoSyncVariants(api) {
 }
 
 export function startAutoSync(api) {
+  let hasCachedData = false;
+  
   // Initialize with cached data if exists
   if (existsSync(variantsDataPath)) {
     try {
       const cached = JSON.parse(readFileSync(variantsDataPath, 'utf-8'));
-      console.log('[AUTO-SYNC] Using cached variants data immediately');
+      if (Object.keys(cached).length > 0) {
+        hasCachedData = true;
+        console.log('[AUTO-SYNC] Using cached variants data');
+      }
     } catch (e) {
-      console.log('[AUTO-SYNC] Cache error, will regenerate');
+      console.log('[AUTO-SYNC] Cache error, will regenerate on first sync');
     }
   }
 
-  console.log('[AUTO-SYNC] Starting initial sync...');
+  console.log('[AUTO-SYNC] Ready - use /sync-variants command to update (respects API rate limits)');
   
-  // Run first sync in background (don't block)
-  setImmediate(() => {
-    autoSyncVariants(api).catch(err => console.error('[AUTO-SYNC] Initial sync error:', err.message));
-  });
-
-  console.log('[AUTO-SYNC] Initial sync queued. Use /sync-variants command to update.');
+  // Only run first sync if NO cached data exists
+  if (!hasCachedData) {
+    console.log('[AUTO-SYNC] No cache found - running initial sync...');
+    setImmediate(() => {
+      autoSyncVariants(api).catch(err => console.error('[AUTO-SYNC] Initial sync error:', err.message));
+    });
+  }
 }
