@@ -18,6 +18,7 @@ The bot operates with a modular command-based structure, where each command is a
 - **Variant Synchronization:** Synchronize product variants with the SellAuth API.
 - **Invoice Viewing:** View detailed invoice information from SellAuth, including real product data, pricing, customer details, and payment methods.
 - **Balance Management:** Add or remove customer balance directly via `/balance-add` and `/balance-remove` (admin only).
+- **Channel Management:** Bulk delete messages via `/clear` command (admin only) - supports up to 100 messages per execution.
 - **Anti-Spam System:** Professional rate limiting - automatically isolates users for 3 days if they execute 5+ replaces within 1-3 seconds (owner exempt). Includes timeout tracking and detailed logging.
 - **Advanced Logging:** Professional command tracking with detailed metadata, execution times, status, and error context. Logs are outputted to Discord embeds, a persistent JSON file (`commandLog.json`), and the console.
 - **Error Monitoring:** Automatic logging of errors with context to `errorLog.json`, tracking up to 100 recent errors for debugging.
