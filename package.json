@@ -19,8 +19,7 @@
   "scripts": {
     "dev": "nodemon index.js",
     "start": "node index.js",
-    "format": "npx prettier --write \"**/*.js\" --config .prettierrc",
-    "build": "npm ci"
+    "format": "npx prettier --write \"**/*.js\" --config .prettierrc"
   },
   "dependencies": {
     "@octokit/rest": "^22.0.1",
