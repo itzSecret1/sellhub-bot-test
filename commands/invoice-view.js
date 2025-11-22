@@ -59,11 +59,14 @@ export default {
 
         let invoiceData = null;
         let foundOnPage = false;
+        let totalInvoicesSearched = 0;
+        let debugSamples = [];
 
-        // Paginate through invoices to find matching ID
-        for (let page = 1; page <= 10; page++) {
+        // Paginate through invoices to find matching ID - search up to 50 pages (12,500 invoices)
+        console.log(`[INVOICE-VIEW] Starting comprehensive search - looking for ID: "${cleanId}"`);
+        
+        for (let page = 1; page <= 50; page++) {
           try {
-            console.log(`[INVOICE-VIEW] API call: shops/${api.shopId}/invoices - page ${page}`);
             const response = await api.get(`shops/${api.shopId}/invoices?limit=250&page=${page}`);
             
             // Handle both array and object responses
@@ -71,34 +74,57 @@ export default {
             console.log(`[INVOICE-VIEW] Page ${page}: ${invoicesList.length} invoices`);
 
             if (invoicesList.length === 0) {
-              console.log(`[INVOICE-VIEW] No more invoices found - stopping search`);
+              console.log(`[INVOICE-VIEW] No more invoices found - stopping search after ${totalInvoicesSearched} invoices`);
               break;
             }
 
-            // Search for invoice by ID in current page
-            const found = invoicesList.find(inv => {
-              // Check multiple possible ID fields
-              return inv.id === cleanId || 
-                     inv.invoice_id === cleanId || 
-                     inv.reference_id === cleanId ||
-                     (inv.id && inv.id.toString() === cleanId);
-            });
+            totalInvoicesSearched += invoicesList.length;
 
-            if (found) {
-              invoiceData = found;
-              foundOnPage = true;
-              console.log(`[INVOICE-VIEW] ✅ Invoice found on page ${page}`);
-              break;
+            // Search for invoice by ID in current page - debug each invoice on first page
+            for (let i = 0; i < invoicesList.length; i++) {
+              const inv = invoicesList[i];
+              
+              // Debug samples from first 2 pages
+              if (page <= 2 && i < 3) {
+                debugSamples.push(`  Page ${page} Invoice ${i}: id="${inv.id}" (${typeof inv.id}), invoice_id="${inv.invoice_id}", reference_id="${inv.reference_id}"`);
+              }
+
+              // Check all possible ID field combinations
+              const idMatch = inv.id === cleanId || 
+                              inv.invoice_id === cleanId || 
+                              inv.reference_id === cleanId ||
+                              (inv.id && inv.id.toString() === cleanId) ||
+                              (inv.invoice_id && inv.invoice_id.toString() === cleanId);
+
+              if (idMatch) {
+                invoiceData = inv;
+                foundOnPage = true;
+                console.log(`[INVOICE-VIEW] ✅ FOUND Invoice on page ${page}!`);
+                console.log(`[INVOICE-VIEW] ✅ Matched ID field: id=${inv.id}, invoice_id=${inv.invoice_id}, reference_id=${inv.reference_id}`);
+                break;
+              }
             }
+
+            if (foundOnPage) break;
+
           } catch (apiError) {
             console.error(`[INVOICE-VIEW] Error fetching page ${page}:`, apiError.message);
             if (apiError.status === 429) {
-              // Rate limited - stop search
+              console.warn(`[INVOICE-VIEW] Rate limited on page ${page}`);
               throw apiError;
             }
             // Continue to next page on other errors
           }
         }
+
+        // Log debug samples for analysis
+        if (debugSamples.length > 0 && !foundOnPage) {
+          console.log(`[INVOICE-VIEW] DEBUG - Sample invoice IDs from API:`);
+          debugSamples.forEach(s => console.log(s));
+          console.log(`[INVOICE-VIEW] DEBUG - Searching for: "${cleanId}" (${typeof cleanId})`);
+        }
+
+        console.log(`[INVOICE-VIEW] Search complete: Searched ${totalInvoicesSearched} invoices, Found: ${foundOnPage}`);
 
         // Check if invoice was found
         if (!invoiceData || !foundOnPage) {
@@ -113,7 +139,8 @@ export default {
             metadata: {
               'Invoice ID': cleanId,
               'Result': 'Not Found',
-              'Pages Searched': '10'
+              'Total Invoices Searched': totalInvoicesSearched.toString(),
+              'Max Pages': '50'
             }
           });
           return;
