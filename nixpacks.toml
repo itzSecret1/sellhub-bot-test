@@ -1,5 +1,8 @@
 [build]
-cmds = ["npm install"]
+cmds = [
+  "npm ci --production",
+  "npm run build"
+]
 
 [start]
 cmd = "npm start"
