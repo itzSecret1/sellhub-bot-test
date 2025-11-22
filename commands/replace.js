@@ -1,4 +1,4 @@
-import { SlashCommandBuilder } from 'discord.js';
+import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { readFileSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
@@ -218,31 +218,37 @@ export default {
 
         addToHistory(product.id, product.name, removedItems, variant.id, variant.name);
 
-        // Format items with Discord message limit in mind
-        let message = `✅ **REPLACE COMPLETADO**\n\n`;
-        message += `📦 Producto: ${product.name}\n`;
-        message += `🎮 Variante: ${variant.name}\n`;
-        message += `📊 Items removidos: ${quantity}\n`;
-        message += `📈 Stock restante: ${deliverablesArray.length}\n\n`;
-        message += `**ITEMS:**\n\`\`\`\n`;
-
+        // Build items list with character limit in mind (embed field limit is ~1024 chars)
         let itemsList = '';
-        let charCount = message.length + 10; // +10 for closing ```
-
+        let displayedCount = 0;
+        
         for (let i = 0; i < removedItems.length; i++) {
           const line = `${i + 1}. ${removedItems[i]}\n`;
-          if (charCount + line.length < 1900) {
+          if (itemsList.length + line.length < 1000) {
             itemsList += line;
-            charCount += line.length;
+            displayedCount++;
           } else {
-            itemsList += `... y ${removedItems.length - i} más`;
+            const remaining = removedItems.length - displayedCount;
+            itemsList += `\n... y ${remaining} más`;
             break;
           }
         }
 
-        message += itemsList + '```';
+        // Create embed
+        const embed = new EmbedBuilder()
+          .setColor(0x00AA00)
+          .setTitle('✅ REPLACE COMPLETADO')
+          .setDescription(`Stock removido exitosamente`)
+          .addFields(
+            { name: '📦 Producto', value: product.name, inline: false },
+            { name: '🎮 Variante', value: variant.name, inline: false },
+            { name: '📊 Items Removidos', value: quantity.toString(), inline: true },
+            { name: '📈 Stock Restante', value: deliverablesArray.length.toString(), inline: true },
+            { name: '📋 Items', value: itemsList || 'Sin items', inline: false }
+          )
+          .setFooter({ text: `Timestamp: ${new Date().toLocaleTimeString()}` });
 
-        await interaction.editReply({ content: message });
+        await interaction.editReply({ embeds: [embed] });
       } else {
         await interaction.editReply({
           content: `❌ No se pudieron obtener los items del stock en este momento. Intenta de nuevo.`
