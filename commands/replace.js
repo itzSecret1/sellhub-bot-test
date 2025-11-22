@@ -45,34 +45,36 @@ async function getVariantStock(api, productId, variantId) {
       `shops/${api.shopId}/products/${productId}/deliverables/${variantId}`
     );
     
-    console.log(`[DEBUG] Deliverables response type: ${typeof deliverablesData}`);
-    console.log(`[DEBUG] Deliverables response keys:`, deliverablesData && Object.keys(deliverablesData).slice(0, 5));
-    console.log(`[DEBUG] Deliverables response (first 200 chars):`, 
-      JSON.stringify(deliverablesData).substring(0, 200));
-    
     let items = [];
     
+    // Try multiple parsing methods to handle different API response formats
     if (typeof deliverablesData === 'string') {
       items = deliverablesData.split('\n').filter(item => item.trim());
-      console.log(`[DEBUG] Parsed as string - got ${items.length} items`);
     } else if (deliverablesData?.deliverables && typeof deliverablesData.deliverables === 'string') {
       items = deliverablesData.deliverables.split('\n').filter(item => item.trim());
-      console.log(`[DEBUG] Parsed from deliverables property - got ${items.length} items`);
     } else if (deliverablesData?.content && typeof deliverablesData.content === 'string') {
       items = deliverablesData.content.split('\n').filter(item => item.trim());
-      console.log(`[DEBUG] Parsed from content property - got ${items.length} items`);
-    } else if (Array.isArray(deliverablesData)) {
-      items = deliverablesData.filter(item => item && (typeof item === 'string' ? item.trim() : item));
-      console.log(`[DEBUG] Parsed as array - got ${items.length} items`);
     } else if (deliverablesData?.data && typeof deliverablesData.data === 'string') {
       items = deliverablesData.data.split('\n').filter(item => item.trim());
-      console.log(`[DEBUG] Parsed from data property - got ${items.length} items`);
+    } else if (Array.isArray(deliverablesData)) {
+      items = deliverablesData.map(item => {
+        if (typeof item === 'string') return item.trim();
+        if (typeof item === 'object' && item?.value) return item.value;
+        return String(item).trim();
+      }).filter(item => item);
+    } else if (deliverablesData?.items && Array.isArray(deliverablesData.items)) {
+      items = deliverablesData.items.map(item => {
+        if (typeof item === 'string') return item.trim();
+        if (typeof item === 'object' && item?.value) return item.value;
+        return String(item).trim();
+      }).filter(item => item);
+    } else if (typeof deliverablesData === 'object' && deliverablesData !== null) {
+      // Last resort: convert object values to array
+      items = Object.values(deliverablesData).map(val => String(val).trim()).filter(item => item);
     }
     
-    console.log(`[DEBUG] Final items array length: ${items.length}`);
     return items;
   } catch (e) {
-    console.error(`[DEBUG] Error getting variant stock:`, e.message);
     return [];
   }
 }
