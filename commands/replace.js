@@ -113,50 +113,60 @@ export default {
   requiredRole: 'staff',
 
   async autocomplete(interaction, api) {
-    const focusedOption = interaction.options.getFocused(true);
-    
-    if (focusedOption.name === 'product') {
-      try {
-        const products = await api.get(`shops/${api.shopId}/products`);
-        const productList = Array.isArray(products) ? products : (products?.data || []);
-        
-        const filtered = productList
-          .filter(p => p.name.toLowerCase().includes(focusedOption.value.toLowerCase()))
-          .slice(0, 25);
-
-        await interaction.respond(
-          filtered.map(p => ({ name: p.name, value: p.id.toString() }))
-        );
-      } catch (e) {
-        await interaction.respond([]);
-      }
-    } 
-    else if (focusedOption.name === 'variant') {
-      const productInput = interaction.options.getString('product');
+    try {
+      const focusedOption = interaction.options.getFocused(true);
       
-      if (!productInput) {
-        await interaction.respond([]);
-        return;
+      if (focusedOption.name === 'product') {
+        try {
+          const products = await api.get(`shops/${api.shopId}/products`);
+          const productList = Array.isArray(products) ? products : (products?.data || []);
+          
+          const filtered = productList
+            .filter(p => p.name.toLowerCase().includes(focusedOption.value.toLowerCase()))
+            .slice(0, 25);
+
+          await interaction.respond(
+            filtered.map(p => ({ name: p.name, value: p.id.toString() }))
+          );
+        } catch (e) {
+          console.error(`[AUTOCOMPLETE] Product error: ${e.message}`);
+          await interaction.respond([]).catch(() => {});
+        }
+      } 
+      else if (focusedOption.name === 'variant') {
+        try {
+          const productInput = interaction.options.getString('product');
+          
+          if (!productInput) {
+            await interaction.respond([]).catch(() => {});
+            return;
+          }
+
+          const variantsData = loadVariantsData();
+          const productData = Object.values(variantsData).find(p => 
+            p.productId.toString() === productInput
+          );
+
+          if (!productData || !productData.variants) {
+            await interaction.respond([]).catch(() => {});
+            return;
+          }
+
+          const variants = Object.values(productData.variants)
+            .map(v => ({
+              name: `${v.name} (${v.stock})`,
+              value: v.id.toString()
+            }))
+            .slice(0, 25);
+
+          await interaction.respond(variants);
+        } catch (e) {
+          console.error(`[AUTOCOMPLETE] Variant error: ${e.message}`);
+          await interaction.respond([]).catch(() => {});
+        }
       }
-
-      const variantsData = loadVariantsData();
-      const productData = Object.values(variantsData).find(p => 
-        p.productId.toString() === productInput
-      );
-
-      if (!productData || !productData.variants) {
-        await interaction.respond([]);
-        return;
-      }
-
-      const variants = Object.values(productData.variants)
-        .map(v => ({
-          name: `${v.name} (${v.stock})`,
-          value: v.id.toString()
-        }))
-        .slice(0, 25);
-
-      await interaction.respond(variants);
+    } catch (error) {
+      console.error(`[AUTOCOMPLETE] Unexpected error: ${error.message}`);
     }
   },
 
@@ -168,7 +178,19 @@ export default {
     const isPrivate = visibility === 'private';
 
     try {
-      await interaction.deferReply({ ephemeral: isPrivate });
+      // Defer reply with safety check
+      try {
+        await interaction.deferReply({ ephemeral: isPrivate });
+      } catch (deferError) {
+        console.error(`[REPLACE] Defer error: ${deferError.message}`);
+        // Fallback: try reply without defer
+        try {
+          await interaction.reply({ content: 'Processing...', ephemeral: isPrivate });
+        } catch (replyError) {
+          console.error(`[REPLACE] Reply fallback error: ${replyError.message}`);
+          return;
+        }
+      }
 
       const products = await api.get(`shops/${api.shopId}/products`);
       const productList = Array.isArray(products) ? products : (products?.data || []);
