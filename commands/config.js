@@ -46,7 +46,7 @@ export default {
   onlyWhitelisted: true,
   requiredRole: 'admin',
 
-  async execute(interaction) {
+  async execute(interaction, api) {
     await quickReply(interaction, async () => {
       const startTime = Date.now();
       try {
