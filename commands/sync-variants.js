@@ -1,7 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { writeFileSync } from 'fs';
 import { join } from 'path';
-import { CommandLogger } from '../utils/commandLogger.js';
+import { AdvancedCommandLogger } from '../utils/advancedCommandLogger.js';
 
 const variantsDataPath = join(process.cwd(), 'variantsData.json');
 
@@ -15,7 +15,7 @@ export default {
 
   async execute(interaction, api) {
     try {
-      await CommandLogger.logCommand(interaction, 'sync-variants');
+      await AdvancedCommandLogger.logCommand(interaction, 'sync-variants');
       // Quick response to prevent timeout
       if (!interaction.deferred && !interaction.replied) {
         await interaction.deferReply({ ephemeral: true }).catch(() => {});
