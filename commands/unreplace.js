@@ -4,19 +4,10 @@ import { join } from 'path';
 import { loadVariantsData } from '../utils/dataLoader.js';
 import { parseDeliverables } from '../utils/parseDeliverables.js';
 import { ErrorLog } from '../utils/errorLogger.js';
-import { CommandLogger } from '../utils/commandLogger.js';
+import { AdvancedCommandLogger } from '../utils/advancedCommandLogger.js';
+import { getHistory, restoreFromHistory } from '../utils/historyManager.js';
 
-const historyFilePath = join(process.cwd(), 'replaceHistory.json');
-
-let historyData = [];
-
-if (existsSync(historyFilePath)) {
-  historyData = JSON.parse(readFileSync(historyFilePath, 'utf-8'));
-}
-
-function saveHistory() {
-  writeFileSync(historyFilePath, JSON.stringify(historyData, null, 2));
-}
+const variantsDataPath = join(process.cwd(), 'variantsData.json');
 
 export default {
   data: new SlashCommandBuilder()
@@ -34,10 +25,20 @@ export default {
   requiredRole: 'staff',
 
   async execute(interaction, api) {
+    const startTime = Date.now();
     const count = interaction.options.getInteger('count') || 1;
 
+    // Validate count
+    if (!Number.isInteger(count) || count < 1 || count > 100) {
+      await interaction.reply({
+        content: `❌ Número inválido. Debe ser entre 1 y 100.`,
+        ephemeral: true
+      });
+      return;
+    }
+
     try {
-      await CommandLogger.logCommand(interaction, 'unreplace');
+      await AdvancedCommandLogger.logCommand(interaction, 'unreplace');
       try {
         await interaction.deferReply({ ephemeral: true });
       } catch (deferError) {
@@ -45,9 +46,7 @@ export default {
         return;
       }
 
-      if (existsSync(historyFilePath)) {
-        historyData = JSON.parse(readFileSync(historyFilePath, 'utf-8'));
-      }
+      const historyData = getHistory();
 
       if (historyData.length === 0) {
         await interaction.editReply({
@@ -63,7 +62,7 @@ export default {
         return;
       }
 
-      const toRestore = historyData.splice(-count);
+      const toRestore = restoreFromHistory(count);
       const restoredInfo = [];
       let totalItemsRestored = 0;
 
