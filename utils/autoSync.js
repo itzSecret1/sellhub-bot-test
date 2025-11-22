@@ -1,4 +1,4 @@
-import { writeFileSync, existsSync } from 'fs';
+import { writeFileSync, existsSync, readFileSync } from 'fs';
 import { join } from 'path';
 
 const variantsDataPath = join(process.cwd(), 'variantsData.json');
@@ -35,15 +35,25 @@ async function autoSyncVariants(api) {
     const products = await api.get(`shops/${api.shopId}/products`);
     const productList = Array.isArray(products) ? products : (products?.data || []);
 
-    // Process each product
+    // Process each product with PARALLEL stock fetching
     for (const product of productList) {
       try {
         if (product.variants && Array.isArray(product.variants) && product.variants.length > 0) {
           const variantMap = {};
 
+          // Fetch all deliverables for this product's variants IN PARALLEL
+          const stockPromises = product.variants.map(variant =>
+            getRealStockFromDeliverables(api, product.id, variant.id)
+              .then(stock => ({ variantId: variant.id, stock }))
+              .catch(() => ({ variantId: variant.id, stock: 0 }))
+          );
+
+          const stockResults = await Promise.all(stockPromises);
+
+          // Map results back to variants
           for (const variant of product.variants) {
-            // Get REAL stock from deliverables endpoint instead of product.variants.stock
-            const realStock = await getRealStockFromDeliverables(api, product.id, variant.id);
+            const stockResult = stockResults.find(r => r.variantId === variant.id);
+            const realStock = stockResult?.stock || 0;
             
             variantMap[variant.id.toString()] = {
               id: variant.id,
@@ -80,11 +90,24 @@ async function autoSyncVariants(api) {
 }
 
 export function startAutoSync(api) {
-  // Run sync immediately on start
-  console.log('[AUTO-SYNC] Starting auto-sync...');
-  autoSyncVariants(api).catch(err => console.error('[AUTO-SYNC] Initial sync error:', err.message));
+  // Initialize with cached data if exists
+  if (existsSync(variantsDataPath)) {
+    try {
+      const cached = JSON.parse(readFileSync(variantsDataPath, 'utf-8'));
+      console.log('[AUTO-SYNC] Using cached variants data');
+    } catch (e) {
+      console.log('[AUTO-SYNC] Cache error, will regenerate');
+    }
+  }
 
-  // Run sync every 30 seconds (reduced from 1 second to prevent blocking)
+  console.log('[AUTO-SYNC] Starting auto-sync...');
+  
+  // Run first sync in background (don't block)
+  setImmediate(() => {
+    autoSyncVariants(api).catch(err => console.error('[AUTO-SYNC] Initial sync error:', err.message));
+  });
+
+  // Run sync every 30 seconds
   setInterval(async () => {
     try {
       await autoSyncVariants(api);
