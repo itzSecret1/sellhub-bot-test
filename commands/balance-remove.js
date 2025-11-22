@@ -1,6 +1,7 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { AdvancedCommandLogger } from '../utils/advancedCommandLogger.js';
 import { ErrorLog } from '../utils/errorLogger.js';
+import { quickReply } from '../utils/quickResponse.js';
 
 export default {
   data: new SlashCommandBuilder()
@@ -30,6 +31,10 @@ export default {
   requiredRole: 'admin',
 
   async execute(interaction, api) {
+    // Use quick reply to ensure response within 3 seconds
+    await quickReply(interaction, async () => {
+      const startTime = Date.now();
+      try {
     const startTime = Date.now();
     const email = interaction.options.getString('email')?.trim();
     const amount = interaction.options.getNumber('amount');
