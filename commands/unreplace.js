@@ -43,7 +43,12 @@ export default {
     const count = interaction.options.getInteger('count') || 1;
 
     try {
-      await interaction.deferReply({ ephemeral: true });
+      try {
+        await interaction.deferReply({ ephemeral: true });
+      } catch (deferError) {
+        console.error(`[UNREPLACE] Defer error: ${deferError.message}`);
+        return;
+      }
 
       if (existsSync(historyFilePath)) {
         historyData = JSON.parse(readFileSync(historyFilePath, 'utf-8'));
@@ -127,7 +132,6 @@ export default {
             }
           } catch (cacheError) {
             console.error(`[UNREPLACE] Cache update error: ${cacheError.message}`);
-            // Don't fail - API was already updated
           }
 
           restoredInfo.push({
@@ -137,7 +141,7 @@ export default {
           });
           totalItemsRestored += removedItems.length;
         } catch (error) {
-          console.error(`[UNREPLACE] Error:`, error);
+          console.error(`[UNREPLACE] Error restoring item:`, error);
           await interaction.editReply({ 
             content: `❌ Error restaurando: ${error.message || 'Error desconocido'}` 
           });
@@ -147,18 +151,21 @@ export default {
 
       saveHistory();
 
-      let responseMsg = `✅ Restaurados **${count}** reemplazo(s)!\n\n`;
+      let responseMsg = `✅ Restaurados **${totalItemsRestored}** item(s)!\n\n`;
       restoredInfo.forEach((info, idx) => {
         responseMsg += `${idx + 1}. **${info.product}** - ${info.variant}\n   → ${info.count} item(s) restaurado(s)\n`;
       });
-      responseMsg += `\n📦 Total items restaurados: **${totalItemsRestored}**`;
 
       await interaction.editReply({ content: responseMsg });
     } catch (error) {
       console.error('[UNREPLACE] Error:', error);
-      await interaction.editReply({ 
-        content: `❌ Error: ${error.message || 'Error desconocido'}` 
-      });
+      try {
+        await interaction.editReply({ 
+          content: `❌ Error: ${error.message || 'Error desconocido'}` 
+        });
+      } catch (e) {
+        console.error('[UNREPLACE] Could not send error message:', e.message);
+      }
     }
   }
 };
