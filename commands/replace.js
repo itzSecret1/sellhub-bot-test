@@ -56,73 +56,99 @@ export default {
   requiredRole: 'staff',
 
   async autocomplete(interaction, api) {
+    let responded = false;
     try {
       const focusedOption = interaction.options.getFocused(true);
-      let responded = false;
 
       try {
         if (focusedOption.name === 'product') {
-          const variantsData = loadVariantsData();
-          const searchTerm = focusedOption.value.toLowerCase();
-          
-          // Optimized: Cache products list
-          const products = Object.values(variantsData)
-            .map((p) => ({
-              name: p.productName,
-              id: p.productId
-            }))
-            .filter((p) => p.name.toLowerCase().includes(searchTerm))
-            .slice(0, 25);
+          try {
+            const variantsData = loadVariantsData();
+            const searchTerm = (focusedOption.value || '').toLowerCase();
+            
+            // Optimized: Direct array mapping and filter
+            const products = Object.values(variantsData)
+              .filter((p) => p && p.productName)
+              .map((p) => ({
+                name: p.productName,
+                id: p.productId
+              }))
+              .filter((p) => p.name.toLowerCase().includes(searchTerm))
+              .slice(0, 25);
 
-          // Respond quickly with filtered results
-          if (products.length > 0) {
-            await interaction.respond(products.map((p) => ({ name: p.name, value: p.id.toString() })));
-          } else {
-            await interaction.respond([]);
+            // Always respond
+            const response = products.map((p) => ({ 
+              name: p.name, 
+              value: p.id.toString() 
+            }));
+            
+            await interaction.respond(response).catch(() => {});
+            responded = true;
+          } catch (err) {
+            console.error(`[REPLACE] Product autocomplete error: ${err.message}`);
+            if (!responded) {
+              await interaction.respond([]).catch(() => {});
+              responded = true;
+            }
           }
-          responded = true;
         } else if (focusedOption.name === 'variant') {
-          const productInput = interaction.options.getString('product');
+          try {
+            const productInput = interaction.options.getString('product');
 
-          if (!productInput) {
-            await interaction.respond([]);
+            if (!productInput) {
+              await interaction.respond([]).catch(() => {});
+              responded = true;
+              return;
+            }
+
+            const variantsData = loadVariantsData();
+            const productData = variantsData[productInput];
+
+            if (!productData || !productData.variants) {
+              await interaction.respond([]).catch(() => {});
+              responded = true;
+              return;
+            }
+
+            const variants = Object.values(productData.variants)
+              .filter((v) => v && v.name)
+              .map((v) => ({
+                name: `${v.name} (${v.stock})`,
+                value: v.id.toString()
+              }))
+              .slice(0, 25);
+
+            await interaction.respond(variants).catch(() => {});
             responded = true;
-            return;
+          } catch (err) {
+            console.error(`[REPLACE] Variant autocomplete error: ${err.message}`);
+            if (!responded) {
+              await interaction.respond([]).catch(() => {});
+              responded = true;
+            }
           }
-
-          const variantsData = loadVariantsData();
-          
-          // Direct lookup by product ID (faster than find)
-          const productData = variantsData[productInput];
-
-          if (!productData || !productData.variants) {
-            await interaction.respond([]);
-            responded = true;
-            return;
-          }
-
-          const variants = Object.values(productData.variants)
-            .map((v) => ({
-              name: `${v.name} (${v.stock})`,
-              value: v.id.toString()
-            }))
-            .slice(0, 25);
-
-          await interaction.respond(variants);
-          responded = true;
         }
       } catch (e) {
-        console.error(`[REPLACE] Autocomplete error: ${e.message}`);
-        if (!responded && interaction.responded === false) {
+        console.error(`[REPLACE] Autocomplete processing error: ${e.message}`);
+        if (!responded) {
           try {
             await interaction.respond([]);
+            responded = true;
           } catch (respondError) {
-            console.error(`[REPLACE] Respond error: ${respondError.message}`);
+            // Silent fail
           }
         }
       }
     } catch (error) {
-      console.error(`[REPLACE] Outer autocomplete error: ${error.message}`);
+      console.error(`[REPLACE] Autocomplete outer error: ${error.message}`);
+      // Attempt final fallback
+      try {
+        if (!responded) {
+          await interaction.respond([]);
+        }
+      } catch (e) {
+        // Silent
+      }
     }
   },
 
