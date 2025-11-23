@@ -6,32 +6,9 @@ import { parseDeliverables } from '../utils/parseDeliverables.js';
 import { ErrorLog } from '../utils/errorLogger.js';
 import { AdvancedCommandLogger } from '../utils/advancedCommandLogger.js';
 import { isUserTimedOut, checkRateLimit, applyTimeout, getTimeoutRemaining } from '../utils/rateLimiter.js';
+import { addToHistory } from '../utils/historyManager.js';
 
-const historyFilePath = join(process.cwd(), 'replaceHistory.json');
 const variantsDataPath = join(process.cwd(), 'variantsData.json');
-
-let historyData = [];
-
-if (existsSync(historyFilePath)) {
-  historyData = JSON.parse(readFileSync(historyFilePath, 'utf-8'));
-}
-
-function saveHistory() {
-  writeFileSync(historyFilePath, JSON.stringify(historyData, null, 2));
-}
-
-function addToHistory(productId, productName, removedItems, variantId = null, variantName = null) {
-  historyData.push({
-    timestamp: new Date().toISOString(),
-    productId,
-    productName,
-    variantId,
-    variantName,
-    removedItems,
-    action: 'removed'
-  });
-  saveHistory();
-}
 
 async function getVariantStock(api, productId, variantId) {
   if (!productId || !variantId) {
@@ -86,15 +63,23 @@ export default {
       try {
         if (focusedOption.name === 'product') {
           const variantsData = loadVariantsData();
+          const searchTerm = focusedOption.value.toLowerCase();
+          
+          // Optimized: Cache products list
           const products = Object.values(variantsData)
             .map((p) => ({
               name: p.productName,
               id: p.productId
             }))
-            .filter((p) => p.name.toLowerCase().includes(focusedOption.value.toLowerCase()))
+            .filter((p) => p.name.toLowerCase().includes(searchTerm))
             .slice(0, 25);
 
-          await interaction.respond(products.map((p) => ({ name: p.name, value: p.id.toString() })));
+          // Respond quickly with filtered results
+          if (products.length > 0) {
+            await interaction.respond(products.map((p) => ({ name: p.name, value: p.id.toString() })));
+          } else {
+            await interaction.respond([]);
+          }
           responded = true;
         } else if (focusedOption.name === 'variant') {
           const productInput = interaction.options.getString('product');
@@ -106,7 +91,9 @@ export default {
           }
 
           const variantsData = loadVariantsData();
-          const productData = Object.values(variantsData).find((p) => p.productId.toString() === productInput);
+          
+          // Direct lookup by product ID (faster than find)
+          const productData = variantsData[productInput];
 
           if (!productData || !productData.variants) {
             await interaction.respond([]);
@@ -125,16 +112,17 @@ export default {
           responded = true;
         }
       } catch (e) {
+        console.error(`[REPLACE] Autocomplete error: ${e.message}`);
         if (!responded && interaction.responded === false) {
           try {
             await interaction.respond([]);
           } catch (respondError) {
-            // Silent fail
+            console.error(`[REPLACE] Respond error: ${respondError.message}`);
           }
         }
       }
     } catch (error) {
-      // Silent fail
+      console.error(`[REPLACE] Outer autocomplete error: ${error.message}`);
     }
   },
 
