@@ -6,6 +6,7 @@ import { checkUserIdWhitelist } from '../utils/checkUserIdWhitelist.js';
 import { config } from '../utils/config.js';
 import { NotWhitelistedException } from '../utils/NotWhitelistedException.js';
 import { startAutoSync } from '../utils/autoSync.js';
+import { sessionManager } from '../utils/SessionRecoveryManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -39,40 +40,19 @@ export class Bot {
     this.onInteractionCreate();
   }
 
-  async loginWithRetry(attempt = 1) {
+  async loginWithRetry() {
     try {
-      console.log(`[BOT LOGIN] Connecting to Discord... (Attempt ${attempt})`);
+      console.log(`[BOT LOGIN] Connecting to Discord...`);
       await this.client.login(config.BOT_TOKEN);
+      sessionManager.markSuccessfulLogin();
     } catch (error) {
       if (error.message && error.message.includes('Not enough sessions')) {
-        // Extract reset time from error message
-        const resetMatch = error.message.match(/resets at ([^;]+)/);
-        const resetTime = resetMatch ? resetMatch[1] : 'unknown';
-        
-        console.error(`\n❌ [BOT LOGIN] Discord session limit reached`);
-        console.error(`   Session reset: ${resetTime}`);
-        console.error(`   Reason: Too many connection attempts in short time`);
-        console.error(`   Solution: Wait for Discord to reset sessions (usually within 1 hour)\n`);
-        
-        // Retry with exponential backoff: 10 min, 20 min, 30 min
-        let waitTime = 10 * 60 * 1000; // 10 minutes
-        if (attempt === 2) waitTime = 20 * 60 * 1000; // 20 minutes
-        if (attempt === 3) waitTime = 30 * 60 * 1000; // 30 minutes
-        
-        if (attempt <= 3) {
-          const waitMinutes = Math.round(waitTime / 60 / 1000);
-          console.log(`[BOT LOGIN] Will retry in ${waitMinutes} minutes (Attempt ${attempt + 1}/3)...`);
-          setTimeout(() => this.loginWithRetry(attempt + 1), waitTime);
-        } else {
-          console.error(`[BOT LOGIN] Max retries reached. Please restart the bot manually.`);
-        }
+        // Handle Discord session limit with automatic recovery
+        await sessionManager.handleSessionLimit(error, () => this.loginWithRetry());
       } else {
-        console.error(`[BOT LOGIN ERROR] ${error.message}`);
-        // Retry on other errors after 30 seconds
-        if (attempt <= 5) {
-          console.log(`[BOT LOGIN] Retrying in 30 seconds...`);
-          setTimeout(() => this.loginWithRetry(attempt + 1), 30 * 1000);
-        }
+        console.error(`\n❌ [BOT LOGIN ERROR] ${error.message}`);
+        console.log(`[BOT LOGIN] Retrying in 30 seconds...\n`);
+        setTimeout(() => this.loginWithRetry(), 30 * 1000);
       }
     }
   }
