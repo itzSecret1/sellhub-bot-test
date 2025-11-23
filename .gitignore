@@ -36,3 +36,4 @@ variantsData.json
 # Build
 dist/
 build/
+data/backups/
