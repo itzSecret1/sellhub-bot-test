@@ -32,6 +32,7 @@ claims.json
 replaceHistory.json
 variantsData.json
 sessionState.json
+connectionState.json
 errorLog.json
 .gitignore
 
