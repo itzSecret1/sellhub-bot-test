@@ -56,99 +56,83 @@ export default {
   requiredRole: 'staff',
 
   async autocomplete(interaction, api) {
-    let responded = false;
     try {
       const focusedOption = interaction.options.getFocused(true);
+      
+      if (focusedOption.name === 'product') {
+        try {
+          const variantsData = loadVariantsData();
+          const searchTerm = (focusedOption.value || '').toLowerCase().trim();
+          
+          // Get all products and filter
+          const products = Object.values(variantsData)
+            .filter((p) => p && p.productName && p.productId)
+            .map((p) => ({
+              name: p.productName.slice(0, 100), // Discord limit
+              id: String(p.productId)
+            }))
+            .filter((p) => 
+              searchTerm === '' || 
+              p.name.toLowerCase().includes(searchTerm) ||
+              p.id.includes(searchTerm)
+            )
+            .slice(0, 25);
 
-      try {
-        if (focusedOption.name === 'product') {
-          try {
-            const variantsData = loadVariantsData();
-            const searchTerm = (focusedOption.value || '').toLowerCase();
-            
-            // Optimized: Direct array mapping and filter
-            const products = Object.values(variantsData)
-              .filter((p) => p && p.productName)
-              .map((p) => ({
-                name: p.productName,
-                id: p.productId
-              }))
-              .filter((p) => p.name.toLowerCase().includes(searchTerm))
-              .slice(0, 25);
+          // Format for Discord
+          const response = products.map((p) => ({
+            name: p.name,
+            value: p.id
+          }));
 
-            // Always respond
-            const response = products.map((p) => ({ 
-              name: p.name, 
-              value: p.id.toString() 
-            }));
-            
-            await interaction.respond(response).catch(() => {});
-            responded = true;
-          } catch (err) {
-            console.error(`[REPLACE] Product autocomplete error: ${err.message}`);
-            if (!responded) {
-              await interaction.respond([]).catch(() => {});
-              responded = true;
-            }
-          }
-        } else if (focusedOption.name === 'variant') {
-          try {
-            const productInput = interaction.options.getString('product');
-
-            if (!productInput) {
-              await interaction.respond([]).catch(() => {});
-              responded = true;
-              return;
-            }
-
-            const variantsData = loadVariantsData();
-            const productData = variantsData[productInput];
-
-            if (!productData || !productData.variants) {
-              await interaction.respond([]).catch(() => {});
-              responded = true;
-              return;
-            }
-
-            const variants = Object.values(productData.variants)
-              .filter((v) => v && v.name)
-              .map((v) => ({
-                name: `${v.name} (${v.stock})`,
-                value: v.id.toString()
-              }))
-              .slice(0, 25);
-
-            await interaction.respond(variants).catch(() => {});
-            responded = true;
-          } catch (err) {
-            console.error(`[REPLACE] Variant autocomplete error: ${err.message}`);
-            if (!responded) {
-              await interaction.respond([]).catch(() => {});
-              responded = true;
-            }
-          }
-        }
-      } catch (e) {
-        console.error(`[REPLACE] Autocomplete processing error: ${e.message}`);
-        if (!responded) {
+          console.log(`[REPLACE] Product autocomplete: Found ${response.length} products for "${searchTerm}"`);
+          await interaction.respond(response);
+        } catch (err) {
+          console.error(`[REPLACE] Product autocomplete error: ${err.message}`);
           try {
             await interaction.respond([]);
-            responded = true;
-          } catch (respondError) {
-            // Silent fail
+          } catch (e) {
+            console.error(`[REPLACE] Failed to respond: ${e.message}`);
+          }
+        }
+      } else if (focusedOption.name === 'variant') {
+        try {
+          const productInput = interaction.options.getString('product');
+
+          if (!productInput) {
+            await interaction.respond([]);
+            return;
+          }
+
+          const variantsData = loadVariantsData();
+          const productData = variantsData[productInput];
+
+          if (!productData || !productData.variants) {
+            console.log(`[REPLACE] No variants found for product ${productInput}`);
+            await interaction.respond([]);
+            return;
+          }
+
+          const variants = Object.values(productData.variants)
+            .filter((v) => v && v.id && v.name)
+            .map((v) => ({
+              name: `${v.name.slice(0, 80)} (${v.stock})`.slice(0, 100),
+              value: String(v.id)
+            }))
+            .slice(0, 25);
+
+          console.log(`[REPLACE] Variant autocomplete: Found ${variants.length} variants`);
+          await interaction.respond(variants);
+        } catch (err) {
+          console.error(`[REPLACE] Variant autocomplete error: ${err.message}`);
+          try {
+            await interaction.respond([]);
+          } catch (e) {
+            console.error(`[REPLACE] Failed to respond: ${e.message}`);
           }
         }
       }
     } catch (error) {
-      console.error(`[REPLACE] Autocomplete outer error: ${error.message}`);
-      // Attempt final fallback
-      try {
-        if (!responded) {
-          await interaction.respond([]);
-        }
-      } catch (e) {
-        // Silent
-      }
+      console.error(`[REPLACE] Autocomplete error: ${error.message}`);
     }
   },
 
