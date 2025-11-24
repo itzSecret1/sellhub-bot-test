@@ -62,16 +62,22 @@ export class SessionRecoveryManager {
    * @returns {Date|null} The time when Discord will allow reconnection
    */
   extractResetTime(errorMessage) {
-    // Discord error format: "Not enough sessions remaining; resets at TIMESTAMP"
-    const resetMatch = errorMessage.match(/resets at (\d+)/);
-    if (resetMatch) {
-      return new Date(parseInt(resetMatch[1]) * 1000);
+    // Try ISO format first: "resets at 2025-11-24T18:33:44.104Z"
+    const isoMatch = errorMessage.match(/resets at (\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[^;,\n]*)/);
+    if (isoMatch) {
+      const date = new Date(isoMatch[1].trim());
+      if (!isNaN(date.getTime())) {
+        return date;
+      }
     }
 
-    // Try ISO format: "resets at 2025-11-24T18:33:44.104Z"
-    const isoMatch = errorMessage.match(/resets at ([^;,\n]+)/);
-    if (isoMatch) {
-      return new Date(isoMatch[1].trim());
+    // Try Unix timestamp format: "resets at 1732000000"
+    const unixMatch = errorMessage.match(/resets at (\d{10,})/);
+    if (unixMatch) {
+      const timestamp = parseInt(unixMatch[1]);
+      if (timestamp > 1000000000) { // Sanity check: must be after year 2001
+        return new Date(timestamp * 1000);
+      }
     }
 
     return null;
