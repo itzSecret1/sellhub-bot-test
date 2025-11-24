@@ -7,6 +7,7 @@ import { config } from '../utils/config.js';
 import { NotWhitelistedException } from '../utils/NotWhitelistedException.js';
 import { startAutoSync } from '../utils/autoSync.js';
 import { sessionManager } from '../utils/SessionRecoveryManager.js';
+import { connectionManager } from '../utils/ConnectionManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -41,18 +42,37 @@ export class Bot {
   }
 
   async loginWithRetry() {
+    // Check if we can safely attempt connection
+    if (!connectionManager.canAttemptConnection()) {
+      const waitTime = connectionManager.getSafeWaitTime();
+      const waitSeconds = Math.ceil(waitTime / 1000);
+      console.log(`[BOT LOGIN] ⏳ Safe wait: ${waitSeconds}s before retry\n`);
+      setTimeout(() => this.loginWithRetry(), waitTime);
+      return;
+    }
+
     try {
-      console.log(`[BOT LOGIN] Connecting to Discord...`);
+      connectionManager.recordAttempt();
+      console.log(`[BOT LOGIN] Connecting to Discord... (Safe attempt)`);
       await this.client.login(config.BOT_TOKEN);
+      
+      // Success
+      connectionManager.markSuccess();
       sessionManager.markSuccessfulLogin();
     } catch (error) {
       if (error.message && error.message.includes('Not enough sessions')) {
-        // Handle Discord session limit with automatic recovery
+        // Handle Discord session limit with enhanced recovery
+        connectionManager.markFailure(true);
         await sessionManager.handleSessionLimit(error, () => this.loginWithRetry());
       } else {
+        // Handle other errors with safer backoff
+        connectionManager.markFailure(false);
         console.error(`\n❌ [BOT LOGIN ERROR] ${error.message}`);
-        console.log(`[BOT LOGIN] Retrying in 30 seconds...\n`);
-        setTimeout(() => this.loginWithRetry(), 30 * 1000);
+        
+        const waitTime = connectionManager.getSafeWaitTime(30 * 1000);
+        const waitSeconds = Math.ceil(waitTime / 1000);
+        console.log(`[BOT LOGIN] Retrying in ${waitSeconds} seconds...\n`);
+        setTimeout(() => this.loginWithRetry(), waitTime);
       }
     }
   }
