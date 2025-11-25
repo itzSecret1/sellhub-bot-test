@@ -12,9 +12,10 @@ const SESSION_STATE_FILE = join(__dirname, '..', 'sessionState.json');
  * Detects when Discord blocks the bot and waits for automatic recovery
  */
 export class SessionRecoveryManager {
-  constructor() {
+  constructor(statusReporter = null) {
     this.state = this.loadState();
     this.isRecovering = false;
+    this.statusReporter = statusReporter;
   }
 
   /**
@@ -143,6 +144,11 @@ export class SessionRecoveryManager {
     // Schedule automatic retry
     if (this.state.attemptCount <= this.state.maxAttempts && this.state.autoRecoveryEnabled) {
       console.log(`[SESSION] ⏳ Waiting for Discord reset... (automatic recovery enabled)`);
+      
+      // Notify staff channel about offline status
+      if (this.statusReporter && resetTime) {
+        this.statusReporter.notifyOfflineWithRecovery(resetTime, this.state.attemptCount);
+      }
       
       // Set up recovery check every minute after reset time
       const recoveryTimeout = setTimeout(() => {
