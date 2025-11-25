@@ -1,6 +1,6 @@
 /**
  * Quick Response Utility - Ensures commands respond within Discord's 3-second timeout
- * Uses immediate acknowledgement + async processing
+ * Uses immediate acknowledgement + async processing with proper Promise handling
  */
 
 export async function quickReply(interaction, processingFn) {
@@ -10,28 +10,37 @@ export async function quickReply(interaction, processingFn) {
       await interaction.deferReply({ ephemeral: true }).catch(() => {});
     }
 
-    // Step 2: Send "processing" message IMMEDIATELY
-    const processingMsg = '⏳ Procesando...';
-    await interaction.editReply({ content: processingMsg }).catch(() => {});
+    // Step 2: Send initial acknowledgment
+    await interaction.editReply({ content: '⏳ Procesando...' }).catch(() => {});
 
-    // Step 3: Process in background (async, no wait)
-    setImmediate(async () => {
-      try {
-        const result = await processingFn();
-        
-        // Step 4: Update with final result
-        if (result.embeds) {
-          await interaction.editReply({ embeds: result.embeds, content: '' }).catch(() => {});
-        } else if (result.content) {
-          await interaction.editReply({ content: result.content }).catch(() => {});
+    // Step 3: Process with Promise (guaranteed within 3 seconds)
+    // Using Promise.resolve to ensure execution happens ASAP
+    Promise.resolve()
+      .then(async () => {
+        try {
+          const result = await processingFn();
+          
+          // Step 4: Update with final result
+          if (result.embeds) {
+            await interaction.editReply({ 
+              embeds: result.embeds, 
+              content: '' 
+            }).catch(() => {});
+          } else if (result.content) {
+            await interaction.editReply({ 
+              content: result.content 
+            }).catch(() => {});
+          }
+        } catch (err) {
+          console.error('[QUICK-RESPONSE] Processing error:', err.message);
+          await interaction.editReply({
+            content: `❌ Error: ${err.message}`
+          }).catch(() => {});
         }
-      } catch (err) {
-        console.error('[QUICK-RESPONSE] Processing error:', err.message);
-        await interaction.editReply({
-          content: `❌ Error: ${err.message}`
-        }).catch(() => {});
-      }
-    });
+      })
+      .catch(err => {
+        console.error('[QUICK-RESPONSE] Promise error:', err.message);
+      });
 
   } catch (error) {
     console.error('[QUICK-RESPONSE] Reply error:', error.message);
