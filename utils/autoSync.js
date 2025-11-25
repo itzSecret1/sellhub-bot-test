@@ -5,32 +5,32 @@ const variantsDataPath = join(process.cwd(), 'variantsData.json');
 
 // Simple sleep function
 function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function getRealStockFromDeliverables(api, productId, variantId, delayMs = 1000) {
   try {
     // Wait to respect rate limits (1 request per minute minimum)
     await sleep(delayMs);
-    
+
     const response = await api.get(
       `shops/${api.shopId}/products/${productId}/deliverables/${variantId}`,
-      { page: 1, perPage: 1 }  // Only need count, not full items
+      { page: 1, perPage: 1 } // Only need count, not full items
     );
-    
+
     let items = 0;
-    
+
     // Parse Laravel pagination response
     if (response?.data && Array.isArray(response.data)) {
       items = response.data.length;
     } else if (response?.total && typeof response.total === 'number') {
       items = response.total;
     } else if (typeof response === 'string') {
-      items = response.split('\n').filter(item => item.trim()).length;
+      items = response.split('\n').filter((item) => item.trim()).length;
     } else if (Array.isArray(response)) {
       items = response.length;
     }
-    
+
     return items;
   } catch (e) {
     console.error(`[AUTO-SYNC] Error fetching stock for ${productId}/${variantId}:`, e.message);
@@ -41,23 +41,23 @@ async function getRealStockFromDeliverables(api, productId, variantId, delayMs =
 // Sequential processing to avoid rate limit (one at a time)
 async function sequentialFetchStocks(api, allVariantsToFetch) {
   const results = [];
-  
+
   for (let i = 0; i < allVariantsToFetch.length; i++) {
     const { product, variant } = allVariantsToFetch[i];
-    
+
     // Delay between requests (60+ seconds to respect rate limit)
     // But on first request, no delay
     const delayMs = i === 0 ? 500 : 60000;
-    
+
     const stock = await getRealStockFromDeliverables(api, product.id, variant.id, delayMs);
     results.push({ productId: product.id, variantId: variant.id, stock });
-    
+
     // Show progress
     if ((i + 1) % 10 === 0) {
       console.log(`[AUTO-SYNC] Fetched ${i + 1}/${allVariantsToFetch.length} stocks...`);
     }
   }
-  
+
   return results;
 }
 
@@ -74,12 +74,12 @@ async function autoSyncVariants(api) {
     let allProducts = [];
     let page = 1;
     let hasMore = true;
-    
+
     while (hasMore && page <= 50) {
       try {
         const response = await api.get(`shops/${api.shopId}/products`, { page, perPage: 100 });
-        const products = Array.isArray(response?.data) ? response.data : (Array.isArray(response) ? response : []);
-        
+        const products = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : [];
+
         if (products.length === 0) {
           hasMore = false;
         } else {
@@ -110,7 +110,7 @@ async function autoSyncVariants(api) {
     // Fetch stock sequentially to avoid rate limits
     if (allVariantsToFetch.length > 0) {
       const stockResults = await sequentialFetchStocks(api, allVariantsToFetch);
-      const stockMap = new Map(stockResults.map(r => [`${r.productId}-${r.variantId}`, r.stock]));
+      const stockMap = new Map(stockResults.map((r) => [`${r.productId}-${r.variantId}`, r.stock]));
 
       // Build variants data
       for (const product of allProducts) {
@@ -120,13 +120,13 @@ async function autoSyncVariants(api) {
 
             for (const variant of product.variants) {
               const realStock = stockMap.get(`${product.id}-${variant.id}`) || 0;
-              
+
               variantMap[variant.id.toString()] = {
                 id: variant.id,
                 name: variant.name,
                 stock: realStock
               };
-              
+
               totalVariants++;
             }
 
@@ -146,11 +146,12 @@ async function autoSyncVariants(api) {
 
     // Save to file
     writeFileSync(variantsDataPath, JSON.stringify(allVariants, null, 2));
-    
+
     const duration = Math.round((Date.now() - startTime) / 1000);
     const timestamp = new Date().toLocaleTimeString();
-    console.log(`[AUTO-SYNC] ${timestamp} - Completed! ${productsWithVariants} products, ${totalVariants} variants (${duration}s)`);
-
+    console.log(
+      `[AUTO-SYNC] ${timestamp} - Completed! ${productsWithVariants} products, ${totalVariants} variants (${duration}s)`
+    );
   } catch (error) {
     const timestamp = new Date().toLocaleTimeString();
     console.error(`[AUTO-SYNC] ${timestamp} - Error:`, error.message);
@@ -159,7 +160,7 @@ async function autoSyncVariants(api) {
 
 export function startAutoSync(api) {
   let hasCachedData = false;
-  
+
   // Initialize with cached data if exists
   if (existsSync(variantsDataPath)) {
     try {
