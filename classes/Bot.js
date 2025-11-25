@@ -100,17 +100,32 @@ export class Bot {
     try {
       const rest = new REST({ version: '9' }).setToken(config.BOT_TOKEN);
 
+      // CRITICAL: Clear array to prevent duplicates on reconnect
+      this.slashCommands = [];
+      this.slashCommandsMap.clear();
+
       const commandFiles = readdirSync(join(__dirname, '..', 'commands'))
         .filter((file) => file.endsWith('.js') && !file.endsWith('.map'));
 
+      // Load all commands
+      const loadedNames = new Set();
       for (const file of commandFiles) {
         try {
           const commandPath = pathToFileURL(join(__dirname, '..', 'commands', `${file}`)).href;
           const command = await import(commandPath);
 
           if (command.default && command.default.data) {
+            const cmdName = command.default.data.name;
+            
+            // Check for duplicates in THIS batch
+            if (loadedNames.has(cmdName)) {
+              console.warn(`[BOT] ⚠️ Duplicate command detected: ${cmdName} (skipped)`);
+              continue;
+            }
+            
+            loadedNames.add(cmdName);
             this.slashCommands.push(command.default.data.toJSON());
-            this.slashCommandsMap.set(command.default.data.name, command.default);
+            this.slashCommandsMap.set(cmdName, command.default);
           }
         } catch (err) {
           console.error(`[BOT] Error loading command ${file}:`, err.message);
