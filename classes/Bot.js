@@ -97,24 +97,39 @@ export class Bot {
   }
 
   async registerSlashCommands() {
-    const rest = new REST({ version: '9' }).setToken(config.BOT_TOKEN);
+    try {
+      const rest = new REST({ version: '9' }).setToken(config.BOT_TOKEN);
 
-    const commandFiles = readdirSync(join(__dirname, '..', 'commands')).filter((file) => !file.endsWith('.map'));
+      const commandFiles = readdirSync(join(__dirname, '..', 'commands'))
+        .filter((file) => file.endsWith('.js') && !file.endsWith('.map'));
 
-    for (const file of commandFiles) {
-      const commandPath = pathToFileURL(join(__dirname, '..', 'commands', `${file}`)).href; // Convert to file:// URL
-      const command = await import(commandPath);
+      for (const file of commandFiles) {
+        try {
+          const commandPath = pathToFileURL(join(__dirname, '..', 'commands', `${file}`)).href;
+          const command = await import(commandPath);
 
-      this.slashCommands.push(command.default.data.toJSON());
-      this.slashCommandsMap.set(command.default.data.name, command.default);
-    }
+          if (command.default && command.default.data) {
+            this.slashCommands.push(command.default.data.toJSON());
+            this.slashCommandsMap.set(command.default.data.name, command.default);
+          }
+        } catch (err) {
+          console.error(`[BOT] Error loading command ${file}:`, err.message);
+        }
+      }
 
-    if (config.BOT_GUILD_ID) {
-      await rest.put(Routes.applicationGuildCommands(this.client.user.id, config.BOT_GUILD_ID), {
-        body: this.slashCommands
-      });
-    } else {
-      await rest.put(Routes.applicationCommands(this.client.user.id), { body: this.slashCommands });
+      console.log(`[BOT] 📤 Registering ${this.slashCommands.length} slash commands...`);
+
+      if (config.BOT_GUILD_ID) {
+        await rest.put(Routes.applicationGuildCommands(this.client.user.id, config.BOT_GUILD_ID), {
+          body: this.slashCommands
+        });
+      } else {
+        await rest.put(Routes.applicationCommands(this.client.user.id), { body: this.slashCommands });
+      }
+
+      console.log(`[BOT] ✅ All ${this.slashCommands.length} slash commands registered successfully`);
+    } catch (error) {
+      console.error('[BOT] Error registering slash commands:', error.message);
     }
   }
 
