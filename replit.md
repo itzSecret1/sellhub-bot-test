@@ -1,208 +1,176 @@
 # SellAuth Discord Bot
 
 ## Overview
-The SellAuth Discord Bot is a production-ready, highly stable Discord bot designed to manage product stock, automate item replacement, and synchronize product variants with the SellAuth platform. It provides staff and administrators with essential tools for efficient inventory management and order fulfillment, featuring advanced logging and robust error handling to ensure reliability and security. The project aims to streamline operations for businesses using the SellAuth platform by integrating key functionalities directly into Discord.
+The SellAuth Discord Bot is a production-ready, highly stable Discord bot designed to manage product stock, automate item replacement, and synchronize product variants with the SellAuth platform. The bot provides comprehensive automation, professional staff notifications, weekly reporting, daily backups, and intelligent moderation. It offers staff and administrators essential tools for efficient inventory management with advanced logging, robust error handling, and automated recovery systems to ensure reliability and security.
 
 ## User Preferences
 I prefer clear, concise, and structured explanations. Focus on high-level decisions and their impact. For coding, prioritize robust error handling, security, and maintainability. When making changes, ensure comprehensive logging is in place and that the system remains stable and performant. I prefer to be informed about critical bug fixes and architectural changes.
 
-## Recent Audit & Fixes (November 24, 2025)
+## Recent Audit & Fixes (November 25, 2025)
 
-### NEW: Professional Staff Status Notifications System (Session 6)
-**Feature:** Implemented `StatusReporter.js` for professional staff channel notifications
-- **Problem Solved:** Staff had no visibility into bot offline/online status or recovery times
-- **Solution:** Automated notification system that sends embeds to staff channel (1441496193711472814)
-  - **Offline Notification:** When bot enters recovery, sends professional embed with:
-    - Exact reconnection time extracted from Discord
-    - Wait duration in human-readable format (e.g., "2h 15m")
-    - Recovery attempt number and status
-    - Clear explanation of what happened
-  - **Daily Online Status:** Every day at 12:00 UTC, sends:
-    - Bot uptime confirmation
-    - List of all available commands
-    - Security status (rate limiting, permissions, error logging, auto-recovery)
-    - Professional formatting with green status indicator
-- **How it works:**
-  1. When session limit detected, `SessionRecoveryManager` calls `StatusReporter.notifyOfflineWithRecovery()`
-  2. `StatusReporter` fetches staff channel and sends professional embed
-  3. Bot tracks daily messages (only sends once per 24h)
-  4. Scheduled automatically at 12:00 UTC every day
-- **Files Added:** `utils/StatusReporter.js`, updated `utils/SessionRecoveryManager.js` and `classes/Bot.js`
-- **Expected Behavior:** 
-  - ✅ Offline message sent to staff when session limit detected
-  - ✅ Online confirmation sent daily at 12:00 UTC
-  - ✅ All messages include timestamps for transparency
+### NEW: Comprehensive Automation Suite - Professional Features (Session 7)
+**Features Implemented:** 7 major new automated systems and commands
 
-### Connection Rate Limiter to Prevent Session Blocking (Session 5)
-**Feature:** Implemented `ConnectionManager.js` for intelligent connection attempt management
-- **Problem Solved:** Bot was attempting reconnections too rapidly after Discord session limits, causing cascading blocks
-- **Solution:** Implemented smart rate limiting for connection attempts
-  - Maximum 2 connection attempts per minute
-  - 30-second minimum between attempts
-  - Automatic 2-minute cooldown if rate limit exceeded
-  - Aggressive backoff on session limit errors (prevents immediate retries)
-- **How it works:**
-  1. Tracks all connection attempts in time window
-  2. Prevents rapid retry loops that trigger Discord throttling
-  3. Implements exponential backoff based on failure patterns
-  4. Clears attempt history on successful connection
-  5. Persists state to `connectionState.json` for robustness
-- **Benefits:** Eliminates session blocking from aggressive reconnection attempts
-- **Files Added:** `utils/ConnectionManager.js`, updated `classes/Bot.js` and `.gitignore`
-- **Expected Reset:** 2025-11-25T18:33:44 UTC - Bot will auto-reconnect exactly at Discord reset time
+#### 1. **Multi-Language Translation Command** (`/translate`)
+- Translate any message to 15+ languages (Spanish, French, Russian, German, Italian, Portuguese, Japanese, Chinese, Korean, Arabic, Hindi, Polish, Dutch, Turkish, English)
+- Beautiful Discord embed output with original + translated text
+- Supports long messages with graceful truncation
+- **Usage:** `/translate message:(text) language:(choose from dropdown)`
 
-### Automatic Discord Session Recovery System (Session 4)
-**Feature:** Implemented `SessionRecoveryManager.js` for automatic bot recovery
-- **Problem Solved:** When Discord blocks bot connections due to rate limits, bot now recovers automatically
-- **How it works:**
-  1. Detects Discord session limit errors automatically
-  2. Extracts exact reset time from Discord error message
-  3. Calculates wait time and schedules automatic retry
-  4. Retries connection without any manual intervention needed
-  5. Persists recovery state to `sessionState.json` for robustness
-- **Recovery Strategy:**
-  - Attempt 1: Waits for Discord's specified reset time (or 10 min backoff)
-  - Attempt 2: Waits 20 minutes if first fails
-  - Attempt 3: Waits 30 minutes if second fails
-  - Auto-retry: Enabled by default, can be disabled if needed
-- **Benefits:** Bot automatically reconnects after Discord throttling periods without user intervention
-- **Logging:** Detailed status messages with exact retry times and attempt counts
-- **Files Added:** `utils/SessionRecoveryManager.js`, updated `classes/Bot.js` and `.gitignore`
+#### 2. **Server Dashboard Command** (`/dashboard`)
+- Real-time server statistics (members, channels, roles, transactions)
+- Bot uptime and performance metrics
+- Quick command reference
+- Interactive buttons for extended stats
+- **Usage:** `/dashboard`
 
-### Critical Bugs Fixed (Session 3)
-1. **Missing ErrorLog Import in sync-variants.js** - Added missing import
-   - Location: Line 4
-   - Impact: Command would crash when errors occurred during sync, now logs properly
+#### 3. **Weekly Automated Reports** (`WeeklyReporter.js`)
+- Scheduled every Monday at **09:00 UTC**
+- Sends professional embed to channel **1442913019788001513**
+- Reports total transactions, success rate, bot status, recommendations
+- Persistent scheduling (survives bot restarts)
 
-2. **Slow Autocomplete in replace.js** - Optimized product lookup
-   - Changed from `.find()` loop to direct object key access (O(1) vs O(n))
-   - Added error logging for autocomplete failures
-   - Impact: Product selection now responds instantly instead of timing out
+#### 4. **Daily Automated Backups** (`DailyBackupReporter.js`)
+- Scheduled daily at **03:00 UTC**
+- Backups all critical files: variantsData.json, replaceHistory.json, sessionState.json
+- Stores backups in `/backups` directory with ISO timestamps
+- Sends detailed backup confirmation to channel **1442913427575013426**
+- Easy recovery system for data restoration
 
-3. **Discord Rate Limit Handling in sync-variants.js** - Improved update throttling
-   - Changed update frequency from every 2 seconds to throttled 3-second updates
-   - Added check to prevent sending updates to non-deferred interactions
-   - Impact: Prevents "Application did not respond" error on Discord
+#### 5. **Auto-Moderation System** (`AutoModerator.js`)
+- Automatically detects Discord server invites in messages
+- Deletes rule-violating messages instantly
+- Sends warning to violating user via DM
+- Logs all moderation actions to channel **1442913855964450901**
+- Excludes bot owners/admins from moderation
+- Reports: user, channel, invites found, timestamp, action taken
 
-4. **Improved Autocomplete Error Handling in replace.js** - Enhanced fallback logic
-   - Added multi-layer try-catch system (3 levels of fallback)
-   - Guarantees response to Discord even if errors occur
-   - Catches null/undefined data gracefully
-   - Impact: Eliminates "Ha hablado un error con las opciones de comando" errors
+#### 6. **Hourly Auto-Sync Scheduler** (`AutoSync.js`)
+- Automatically syncs product variants **every 60 minutes**
+- No manual intervention required
+- Tracks sync duration and logs all operations
+- Graceful error handling with fallback
 
-### Previous Fixes (November 22, 2025)
+#### 7. **Daily Status Updates** (Enhanced)
+- Sends status confirmation to staff channel **1441496193711472814** at **12:00 UTC daily**
+- Shows uptime, commands available, security status
+- Green embed when online, Red embed when offline with recovery time
 
-1. **Logger Typos (3x)** - `AdvancedAdvancedCommandLogger` → `AdvancedCommandLogger`
-   - Locations: `stock.js` (2x), `unreplace.js` (1x)
-   - Impact: Logging was failing silently
+---
 
-2. **Missing API Parameter (6 commands)** - Added `api` parameter to function signatures
-   - Commands: `invoice-view`, `audit`, `config`, `status`, `role-info`, `stats`
-   - Impact: API calls were unreliable
+### Integration Architecture
 
-3. **Missing await in Bot.js** - Added `await` for error handling
-   - Location: Line 141
-   - Impact: Prevented proper error capture and race conditions
+**Automated System Timeline (UTC):**
+```
+03:00 UTC - Daily Backups created → Channel 1442913427575013426
+09:00 UTC (Mondays) - Weekly Reports → Channel 1442913019788001513  
+12:00 UTC Daily - Status Updates → Channel 1441496193711472814
+18:33:44 UTC (Nov 25) - Bot Auto-Reconnects → All systems activate
+Every 60 minutes - Auto-Sync variants (background)
+Continuous - Auto-Moderation running
+```
 
-4. **Null Safety in checkUserIdWhitelist** - Added validation
-   - Protected against undefined config access
-   - Impact: Prevented crashes
+**Error Handling:**
+- All systems gracefully handle errors
+- Failed backups reported to staff
+- Missing channels logged but don't crash systems
+- Connection failures trigger auto-recovery
 
-5. **SetInterval Memory Leak in sync-variants** - Improved cleanup
-   - Added proper clearInterval() in all paths
-   - Added error logging for failed updates
-   - Impact: Prevented memory accumulation
+**Data Persistence:**
+- All scheduled tasks survive bot restarts
+- State tracked in: sessionState.json, connectionState.json, replaceHistory.json
+- Backups stored in: backups/ directory with ISO 8601 timestamps
 
-6. **Silent Catch Blocks** - Added logging to all .catch() handlers
-   - Improved visibility into hidden errors
-   - Impact: Better debugging and monitoring
+---
 
-7. **Race Condition in rateLimiter** - Improved thread safety
-   - Enhanced Map operations in trackAction()
-   - Impact: Safer concurrent user access
+### Previous Systems (Session 5-6)
 
-8. **Duplicated History Logic** - Centralized into `historyManager.js`
-   - Removed duplicate code from replace.js and unreplace.js
-   - Impact: Single source of truth for history management
+**Connection Rate Limiter** (`ConnectionManager.js`)
+- Max 2 connection attempts per minute
+- 30-second minimum between attempts
+- Automatic 2-minute cooldown on rate limit hits
+- Prevents cascading session blocks
 
-### Code Quality Improvements
-- **Centralized History Management**: New `utils/historyManager.js` exports reusable functions
-- **Better Error Handling**: Added try-catch for file operations and API calls
-- **Input Validation**: Enhanced unreplace.js with count validation (1-100)
-- **Performance Optimization**: Optimized autocomplete lookups (O(1) key access vs O(n) search)
+**Session Recovery Manager** (`SessionRecoveryManager.js`)
+- Detects Discord session limit errors
+- Extracts exact reset time from Discord
+- Schedules automatic reconnection
+- Zero manual intervention
+
+**Professional Status Notifications** (`StatusReporter.js`)
+- Offline notifications with reconnection time
+- Daily online confirmations
+- Beautiful Discord embeds with professional formatting
+
+---
 
 ## System Architecture
-The bot operates with a modular command-based structure, where each command is an independent module. It includes a core `Bot.js` class for Discord integration and an `Api.js` class for interacting with the SellAuth API. Advanced logging is central to the system, utilizing an `AdvancedCommandLogger` for detailed command tracking and an `errorLogger` for robust error monitoring. Data is cached locally in `variantsData.json` and `replaceHistory.json` for performance. Error handling is designed to be comprehensive, covering API rate limits, network issues, and specific SellAuth API error codes. Security measures include input validation, type safety, null checks, and ensuring no sensitive data is exposed in logs.
+The bot operates with a modular command-based structure where each command is an independent module. It includes:
+- **Core `Bot.js` class** for Discord integration and system initialization
+- **`Api.js` class** for SellAuth API interactions
+- **Advanced `AdvancedCommandLogger`** for detailed command tracking
+- **`errorLogger`** for robust error monitoring
+- **Multiple automated reporter systems** for staff notifications
+- **Auto-moderation** for rule enforcement
+- **Persistent state management** for recovery and reliability
 
-**UI/UX Decisions:**
-- Discord Embeds are used for displaying command results and log entries in a user-friendly, structured format within Discord channels.
-- Color-coded console output is used for developer-side logging.
+## Feature Specifications
 
-**Feature Specifications:**
-- **Stock Management:** View and extract product stock, with the ability to restore previous extractions.
-- **Variant Synchronization:** Synchronize product variants with the SellAuth API.
-- **Invoice Viewing:** View detailed invoice information from SellAuth, including real product data, pricing, customer details, and payment methods.
-- **Balance Management:** Add or remove customer balance directly via `/balance-add` and `/balance-remove` (admin only).
-- **Channel Management:** Bulk delete messages via `/clear` command (admin only) - supports up to 100 messages per execution.
-- **Server Backup System:** Anti-raid protection with `/backup`, `/loadbackup`, and `/listbackup` commands. Automatically saves roles, channels, permissions with date-stamped backups.
-- **Audit Logging System:** Comprehensive server monitoring with `/audit` command - tracks role changes, channel modifications, member actions, and configuration updates. Stores up to 500 audit entries per guild.
-- **Server Configuration:** `/config` command for managing server settings, protecting critical roles, and configuring audit logging. Persistent storage of important configurations.
-- **Role Protection System:** Protect important roles from deletion or unauthorized modification with detailed reason tracking.
-- **System Monitoring:** `/status` command displays bot performance, uptime, memory usage, CPU usage, and network latency. `/role-info` provides detailed role statistics and member counts.
-- **Anti-Spam System:** Professional rate limiting - automatically isolates users for 3 days if they execute 5+ replaces within 1-3 seconds (owner exempt). Includes timeout tracking and detailed logging.
-- **Advanced Logging:** Professional command tracking with detailed metadata, execution times, status, and error context. Logs are outputted to Discord embeds, persistent JSON files, and the console.
-- **Error Monitoring:** Automatic logging of errors with context to `errorLog.json`, tracking up to 100 recent errors for debugging.
-- **Permission Validation:** Built-in permission checking before executing sensitive operations, ensuring bot has required Discord permissions.
-- **Ultra-Fast Responses:** All commands respond within 1 second to avoid Discord timeouts using the `quickResponse.js` utility.
+### Core Commands
+- `/stock` - View and extract product stock
+- `/replace` - Automate item replacement
+- `/unreplace` - Undo replacements
+- `/sync-variants` - Synchronize product variants
+- `/invoice-view` - View detailed invoice information
+- `/balance-add` - Add customer balance (admin only)
+- `/balance-remove` - Remove customer balance (admin only)
+- `/clear` - Bulk delete messages (admin only)
+- `/backup` - Create server backup (admin only)
+- `/loadbackup` - Restore server backup (admin only)
+- `/listbackup` - List all available backups (admin only)
+- `/audit` - View comprehensive audit logs (admin only)
+- `/config` - Manage server settings
+- `/status` - System performance monitoring
+- `/role-info` - Role statistics and information
+- `/help` - Command help and documentation
 
-**System Design Choices:**
-- **Modular Command Structure:** Commands are isolated in the `commands/` directory for easy management and scalability (17 commands total: stock, replace, unreplace, sync-variants, invoice-view, balance-add, balance-remove, clear, backup, loadbackup, listbackup, help, stats, status, role-info, audit, config).
-- **Centralized API Client:** A dedicated `Api.js` class encapsulates all interactions with the SellAuth API, promoting reusability and maintainability.
-- **Robust Error Handling:** Implemented across all API interactions and command executions to ensure system stability and provide clear feedback on issues.
-- **Persistent Data Storage:** Key data like product variants, replace history, logs, backups, and audit entries are stored in JSON files for persistence and quick access.
-- **Comprehensive ID Search:** Invoice lookup supports multiple ID fields (`id`, `unique_id`, `invoice_id`, `reference_id`) and pagination for thorough searching.
-- **Professional Rate Limiting:** Dedicated `rateLimiter.js` utility tracks user actions, detects spam patterns (5+ actions in 1-3 seconds), and applies automatic 3-day timeouts with real-time duration tracking.
-- **Backup System:** `BackupManager.js` handles server state snapshots including roles, channels, permissions with date-stamped storage and verification.
-- **Audit Logging System:** `AuditLogger.js` tracks all significant server events with timestamps, event types, and detailed metadata. Supports filtering by event type and time range.
-- **Server Configuration:** `ServerConfig.js` manages persistent server settings, protected roles, audit channel assignments, and feature toggles per guild.
-- **Permission Validation:** `PermissionValidator.js` ensures bot has required Discord permissions before executing sensitive operations, providing detailed permission reports.
-- **Performance Optimization:** `quickResponse.js` ensures all commands respond within Discord's 3-second timeout by using immediate acknowledgment with background processing.
-- **Scalable Architecture:** Supports multiple servers simultaneously with isolated configurations, audit logs, and backups per guild.
-- **Centralized History Management:** `historyManager.js` provides single source of truth for replace/unreplace history with safe file operations.
-- **Session Recovery Management:** `SessionRecoveryManager.js` handles Discord connection throttling automatically - detects session limits, extracts reset times, schedules retries, and recovers without manual intervention using persistent state tracking.
-- **Connection Rate Limiting:** `ConnectionManager.js` prevents connection spam by enforcing rate limits (max 2/minute), minimum wait times (30s), and aggressive backoff on session limits - eliminates cascading connection blocks.
-- **Professional Status Notifications:** `StatusReporter.js` sends automated professional embeds to staff channel - offline recovery notifications with exact reconnection times, and daily online confirmations at 12:00 UTC showing uptime, commands, and security status.
+### New Automated Features
+- **`/translate`** - Multi-language translation (15+ languages)
+- **`/dashboard`** - Real-time server statistics and status
+- **Weekly Reports** - Automated Monday 09:00 UTC to channel 1442913019788001513
+- **Daily Backups** - Automated 03:00 UTC to channel 1442913427575013426
+- **Daily Status** - Automated 12:00 UTC to channel 1441496193711472814
+- **Auto-Sync** - Every 60 minutes (background)
+- **Auto-Moderation** - Continuous with logging to channel 1442913855964450901
+
+### Advanced Security & Monitoring
+- **Rate limiting** with automatic user isolation
+- **Permission validation** before sensitive operations
+- **Error monitoring** with automatic logging
+- **Auto-recovery** for Discord session limits
+- **Professional audit logging** with timestamps
+- **Role protection system** against unauthorized changes
+- **Anti-spam system** with professional response throttling
+
+---
+
+## System Design Choices
+- **Modular Architecture:** Commands and systems isolated for scalability
+- **Centralized API Client:** `Api.js` handles all SellAuth interactions
+- **Robust Error Handling:** Comprehensive error coverage with graceful fallbacks
+- **Persistent Storage:** JSON files for state, scheduled tasks, and recovery
+- **Professional Formatting:** Discord embeds for all user-facing output
+- **Automated Systems:** Scheduled tasks with zero manual intervention
+- **Logging:** Detailed logging to both console and Discord channels
+- **Rate Limiting:** Connection and API request throttling
+- **Session Recovery:** Automatic bot recovery without manual intervention
+- **Moderation:** Automated rule enforcement with staff visibility
+
+---
 
 ## External Dependencies
-- **Discord API:** For bot interactions, commands, and sending messages/embeds.
-- **SellAuth API:** For all product, stock, and invoice data management.
-- **Railway:** Cloud platform for continuous deployment and hosting.
-- **GitHub:** Version control and source code management, integrated with Railway for auto-deployment.
-
-## Production Readiness Verification
-✅ **Code Quality:**
-- 27 JavaScript files verified (8,000+ lines)
-- All 17 commands have proper error handling
-- Comprehensive logging in all operations
-- Type validation and null-safety checks
-
-✅ **Performance:**
-- All commands respond < 1 second
-- Rate limiting functional and tested
-- Memory management optimized
-- Promise handling improved
-
-✅ **Security:**
-- Input validation on all commands
-- Null-safe operations throughout
-- No secrets exposed in logs
-- Permission validation before operations
-
-✅ **Reliability:**
-- Logging 100% functional in 17/17 commands
-- Error tracking complete with context
-- State management consistent
-- Auto-recovery for transient errors
-
-## Deployment Status
-✅ **Bot is production-ready** - All critical issues identified and fixed. System is stable, secure, and performs optimally.
+- **Discord API:** For bot interactions, commands, and messaging
+- **SellAuth API:** For product, stock, and invoice data management
+- **Google Translate API:** For multi-language translation (@vitalets/google-translate-api)
+- **Railway:** Cloud platform for continuous deployment
+- **GitHub:** Version control and source code management
