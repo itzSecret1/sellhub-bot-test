@@ -1,3 +1,4 @@
+// Version: 2025-11-25T19:04:14.358Z
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -8,10 +9,12 @@ import { config } from './utils/config.js';
 
 // Validate required environment variables
 const requiredVars = ['BOT_TOKEN', 'BOT_GUILD_ID', 'SA_API_KEY', 'SA_SHOP_ID'];
-const missingVars = requiredVars.filter(v => !process.env[v]);
+const missingVars = requiredVars.filter((v) => !process.env[v]);
 
 if (missingVars.length > 0) {
-  console.error(`\n❌ ERROR: Missing required environment variables:\n${missingVars.map(v => `   - ${v}`).join('\n')}\n`);
+  console.error(
+    `\n❌ ERROR: Missing required environment variables:\n${missingVars.map((v) => `   - ${v}`).join('\n')}\n`
+  );
   console.error('Please ensure these variables are set in your environment or .env file');
   process.exit(1);
 }
