@@ -5,7 +5,7 @@ import { loadVariantsData } from '../utils/dataLoader.js';
 import { parseDeliverables } from '../utils/parseDeliverables.js';
 import { ErrorLog } from '../utils/errorLogger.js';
 import { AdvancedCommandLogger } from '../utils/advancedCommandLogger.js';
-import { getHistory, restoreFromHistory } from '../utils/historyManager.js';
+import { getHistory, restoreFromHistory, saveHistory } from '../utils/historyManager.js';
 
 const variantsDataPath = join(process.cwd(), 'variantsData.json');
 
