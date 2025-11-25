@@ -58,6 +58,15 @@ export class Bot {
     });
 
     this.onInteractionCreate();
+
+    // Global error handler to prevent bot crash
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('[BOT] Unhandled Rejection at:', promise, 'reason:', reason);
+    });
+
+    process.on('uncaughtException', (error) => {
+      console.error('[BOT] Uncaught Exception:', error);
+    });
   }
 
   async loginWithRetry() {
@@ -108,7 +117,6 @@ export class Bot {
         .filter((file) => file.endsWith('.js') && !file.endsWith('.map'));
 
       // Load all commands
-      const loadedNames = new Set();
       for (const file of commandFiles) {
         try {
           const commandPath = pathToFileURL(join(__dirname, '..', 'commands', `${file}`)).href;
@@ -117,13 +125,11 @@ export class Bot {
           if (command.default && command.default.data) {
             const cmdName = command.default.data.name;
             
-            // Check for duplicates in THIS batch
-            if (loadedNames.has(cmdName)) {
-              console.warn(`[BOT] ⚠️ Duplicate command detected: ${cmdName} (skipped)`);
+            // Skip if already loaded
+            if (this.slashCommandsMap.has(cmdName)) {
               continue;
             }
             
-            loadedNames.add(cmdName);
             this.slashCommands.push(command.default.data.toJSON());
             this.slashCommandsMap.set(cmdName, command.default);
           }
