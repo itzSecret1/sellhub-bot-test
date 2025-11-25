@@ -13,6 +13,7 @@ import { createWeeklyReporter } from '../utils/WeeklyReporter.js';
 import { createDailyBackupReporter } from '../utils/DailyBackupReporter.js';
 import { createAutoModerator } from '../utils/AutoModerator.js';
 import { createAutoSyncScheduler } from '../utils/AutoSync.js';
+import { createPredictiveAlerts } from '../utils/PredictiveAlerts.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -38,6 +39,7 @@ export class Bot {
     this.dailyBackupReporter = createDailyBackupReporter(client);
     this.autoModerator = createAutoModerator(client);
     this.autoSyncScheduler = createAutoSyncScheduler(client, api);
+    this.predictiveAlerts = createPredictiveAlerts(client);
 
     // Login with retry logic for Discord rate limits
     this.loginWithRetry();
@@ -136,6 +138,9 @@ export class Bot {
 
       // Auto-moderation
       this.autoModerator.setup();
+
+      // Predictive alerts
+      this.predictiveAlerts.scheduleAlertChecks();
 
       console.log('[BOT] ✅ All automated systems initialized');
     } catch (error) {
