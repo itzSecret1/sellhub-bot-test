@@ -105,7 +105,7 @@ export class Bot {
       const commandPath = pathToFileURL(join(__dirname, '..', 'commands', `${file}`)).href; // Convert to file:// URL
       const command = await import(commandPath);
 
-      this.slashCommands.push(command.default.data);
+      this.slashCommands.push(command.default.data.toJSON());
       this.slashCommandsMap.set(command.default.data.name, command.default);
     }
 
