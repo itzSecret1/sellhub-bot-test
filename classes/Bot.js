@@ -8,6 +8,7 @@ import { NotWhitelistedException } from '../utils/NotWhitelistedException.js';
 import { startAutoSync } from '../utils/autoSync.js';
 import { sessionManager } from '../utils/SessionRecoveryManager.js';
 import { connectionManager } from '../utils/ConnectionManager.js';
+import { createStatusReporter } from '../utils/StatusReporter.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -24,6 +25,12 @@ export class Bot {
     this.cooldowns = new Collection();
     this.queues = new Collection();
 
+    // Create status reporter for staff notifications
+    this.statusReporter = createStatusReporter(client);
+    
+    // Inject status reporter into session manager
+    sessionManager.statusReporter = this.statusReporter;
+
     // Login with retry logic for Discord rate limits
     this.loginWithRetry();
 
@@ -31,6 +38,12 @@ export class Bot {
       console.log(`${this.client.user.username} ready!`);
       this.registerSlashCommands();
       startAutoSync(this.api);
+      
+      // Send daily status update to staff channel
+      this.sendDailyStatusUpdate();
+      
+      // Schedule daily status updates at 12:00 UTC
+      this.scheduleDailyStatusUpdates();
     });
 
     this.client.on('warn', (info) => console.log(info));
@@ -97,6 +110,43 @@ export class Bot {
     } else {
       await rest.put(Routes.applicationCommands(this.client.user.id), { body: this.slashCommands });
     }
+  }
+
+  /**
+   * Send daily status update to staff channel
+   */
+  async sendDailyStatusUpdate() {
+    try {
+      if (this.statusReporter) {
+        await this.statusReporter.sendDailyStatusUpdate();
+      }
+    } catch (error) {
+      console.error('[BOT] Error sending daily status:', error.message);
+    }
+  }
+
+  /**
+   * Schedule daily status updates at 12:00 UTC
+   */
+  scheduleDailyStatusUpdates() {
+    const now = new Date();
+    const tomorrow = new Date(now);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    tomorrow.setUTCHours(12, 0, 0, 0);
+
+    const timeUntilNext = tomorrow - now;
+
+    console.log(`[BOT] ✅ Daily status updates scheduled at 12:00 UTC (in ${Math.ceil(timeUntilNext / 1000 / 60)} minutes)`);
+
+    // Schedule for tomorrow
+    setTimeout(
+      () => {
+        this.sendDailyStatusUpdate();
+        // Then schedule for every 24 hours
+        setInterval(() => this.sendDailyStatusUpdate(), 24 * 60 * 60 * 1000);
+      },
+      timeUntilNext
+    );
   }
 
   async onInteractionCreate() {
