@@ -1,4 +1,4 @@
-import { startAutoSync } from '../utils/autoSync.js';
+import { startAutoSync } from './autoSync.js';
 import { EmbedBuilder } from 'discord.js';
 
 const SYNC_LOG_CHANNEL = process.env.BOT_LOG_CHANNEL || '1442913019788001513';
