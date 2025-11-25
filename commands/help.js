@@ -1,16 +1,15 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
 import { AdvancedCommandLogger } from '../utils/advancedCommandLogger.js';
-import { quickReply } from '../utils/quickResponse.js';
 
 export default {
   data: new SlashCommandBuilder().setName('help').setDescription('Show all available commands and their usage'),
 
   async execute(interaction) {
-    // Use quick reply to ensure response within 3 seconds
-    await quickReply(interaction, async () => {
-      const startTime = Date.now();
-      try {
-        const embeds = [
+    const startTime = Date.now();
+    try {
+      await interaction.deferReply({ ephemeral: true });
+
+      const embeds = [
           new EmbedBuilder()
             .setColor(0x00aa00)
             .setTitle('📚 SellAuth Bot - Guía Completa')
@@ -135,31 +134,33 @@ export default {
               { name: '✅ Backup', value: 'Crea backups antes de eventos importantes', inline: false },
               { name: '✅ Privacidad', value: 'Usa `visibility:private` para entregas confidenciales', inline: false }
             )
-            .setFooter({ text: 'SellAuth Bot v1.0 | 13 Comandos' })
+            .setFooter({ text: 'SellAuth Bot v1.0 | 17 Comandos' })
             .setTimestamp()
         ];
 
-        await AdvancedCommandLogger.logCommand(interaction, 'help', {
-          status: 'EXECUTED',
-          result: `Help displayed with ${embeds.length} embeds`,
-          executionTime: Date.now() - startTime,
-          metadata: {
-            'Embeds': embeds.length.toString()
-          }
-        });
+      await interaction.editReply({ embeds });
+      
+      await AdvancedCommandLogger.logCommand(interaction, 'help', {
+        status: 'EXECUTED',
+        result: `Help displayed with ${embeds.length} embeds`,
+        executionTime: Date.now() - startTime,
+        metadata: {
+          'Embeds': embeds.length.toString()
+        }
+      });
+    } catch (error) {
+      console.error('[HELP] Error:', error);
+      await AdvancedCommandLogger.logCommand(interaction, 'help', {
+        status: 'ERROR',
+        result: error.message,
+        executionTime: Date.now() - startTime,
+        errorCode: error.name,
+        stackTrace: error.stack
+      }).catch(() => {});
 
-        return { embeds };
-      } catch (error) {
-        console.error('[HELP] Error:', error);
-        await AdvancedCommandLogger.logCommand(interaction, 'help', {
-          status: 'ERROR',
-          result: error.message,
-          executionTime: Date.now() - startTime,
-          errorCode: error.name,
-          stackTrace: error.stack
-        });
-        return { content: `❌ Error: ${error.message}` };
-      }
-    });
+      await interaction.editReply({ 
+        content: `❌ Error: ${error.message}` 
+      }).catch(() => {});
+    }
   }
 };
