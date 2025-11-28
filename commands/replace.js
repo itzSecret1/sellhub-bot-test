@@ -140,8 +140,8 @@ export default {
     const productInput = interaction.options.getString('product');
     const quantity = interaction.options.getInteger('quantity');
     const variantInput = interaction.options.getString('variant');
-    const visibility = interaction.options.getString('visibility') || 'private';
-    const isPrivate = visibility === 'private';
+    const visibility = interaction.options.getString('visibility');
+    const isPrivate = visibility !== 'public';
     const userId = interaction.user.id;
     const ownerId = process.env.BOT_USER_ID_WHITELIST?.split(',')[0]; // Owner is first in whitelist
 
@@ -375,15 +375,17 @@ export default {
         });
       }
 
-      // Create response embed
-      const embed = new EmbedBuilder().setColor(0x00aa00).setTitle(`✅ Items Extraídos`);
+      // Create response embed - Show ALL items
+      const embed = new EmbedBuilder().setColor(0x00aa00).setTitle(`✅ Items Extraídos (${removedItems.length})`);
 
       let itemsText = '';
-      for (let i = 0; i < Math.min(removedItems.length, 5); i++) {
-        itemsText += `${i + 1}. ${removedItems[i].substring(0, 80)}\n`;
-      }
-      if (removedItems.length > 5) {
-        itemsText += `\n... y ${removedItems.length - 5} items más`;
+      for (let i = 0; i < removedItems.length; i++) {
+        const itemLine = `${i + 1}. ${removedItems[i].substring(0, 100)}\n`;
+        if ((itemsText + itemLine).length <= 1024) {
+          itemsText += itemLine;
+        } else {
+          break;
+        }
       }
 
       embed.addFields([
@@ -391,7 +393,7 @@ export default {
         { name: '🎮 Variante', value: variantData.name, inline: true },
         { name: '📦 Cantidad', value: quantity.toString(), inline: true },
         { name: '📊 Stock Restante', value: remainingStock.toString(), inline: true },
-        { name: '📋 Items Extraídos', value: itemsText, inline: false }
+        { name: `📋 Items Extraídos (${removedItems.length} Total)`, value: itemsText || 'N/A', inline: false }
       ]);
 
       await interaction.editReply({ embeds: [embed] });
