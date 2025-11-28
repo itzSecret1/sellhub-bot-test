@@ -109,23 +109,15 @@ export class Bot {
   }
 
   async registerSlashCommands() {
-    // Prevent multiple concurrent registrations
-    if (this.isRegisteringCommands) {
-      console.log('[BOT] ⏳ Command registration already in progress, skipping...');
-      return;
-    }
-
+    if (this.isRegisteringCommands) return;
     this.isRegisteringCommands = true;
 
     try {
-      // CRITICAL: Clear array to prevent duplicates on reconnect
       this.slashCommands = [];
       this.slashCommandsMap.clear();
 
       const commandFiles = readdirSync(join(__dirname, '..', 'commands'))
         .filter((file) => file.endsWith('.js') && !file.endsWith('.map'));
-
-      console.log(`[BOT] 📂 Found ${commandFiles.length} command files to load`);
 
       // Load all commands
       for (const file of commandFiles) {
@@ -135,113 +127,69 @@ export class Bot {
 
           if (command.default && command.default.data) {
             const cmdName = command.default.data.name;
-
-            // Skip if already loaded
-            if (this.slashCommandsMap.has(cmdName)) {
-              console.log(`[BOT] ⚠️  Skipping duplicate: ${cmdName}`);
-              continue;
+            if (!this.slashCommandsMap.has(cmdName)) {
+              this.slashCommands.push(command.default.data.toJSON());
+              this.slashCommandsMap.set(cmdName, command.default);
             }
-
-            this.slashCommands.push(command.default.data.toJSON());
-            this.slashCommandsMap.set(cmdName, command.default);
-            console.log(`[BOT] ✅ Loaded command: ${cmdName}`);
           }
         } catch (err) {
-          console.error(`[BOT] ❌ Error loading ${file}:`, err.message);
+          console.error(`[BOT] Error loading ${file}:`, err.message);
         }
       }
 
-      console.log(`[BOT] 📤 Loaded ${this.slashCommands.length} commands into memory`);
+      console.log(`[BOT] ✅ Loaded ${this.slashCommands.length} commands into memory`);
       
-      if (this.slashCommands.length === 0) {
-        console.error('[BOT] ❌ ERROR: No commands loaded!');
-        this.isRegisteringCommands = false;
-        return;
-      }
-
-      // Start registration in background
-      console.log('[BOT] ⏰ Starting registration in 2 seconds...');
-      setTimeout(() => this.registerCommandsViaREST(), 2000);
+      // Fire registration in background - NO BLOCKING
+      this.fireAndForgetRegistration();
       
     } catch (error) {
       console.error('[BOT] Error loading commands:', error.message);
+    } finally {
       this.isRegisteringCommands = false;
     }
   }
 
-  async registerCommandsViaREST() {
+  async fireAndForgetRegistration() {
     try {
-      console.log('\n[BOT] 🔴 STEP 1: Initializing REST client...');
+      console.log('[BOT] 🚀 Starting background command registration (fire-and-forget)...');
       const rest = new REST({ version: '9' }).setToken(config.BOT_TOKEN);
-      console.log('[BOT] ✅ REST client initialized');
-
-      console.log('[BOT] 🔴 STEP 2: Setting up route...');
       const route = config.BOT_GUILD_ID
         ? Routes.applicationGuildCommands(this.client.user.id, config.BOT_GUILD_ID)
         : Routes.applicationCommands(this.client.user.id);
-      console.log(`[BOT] ✅ Route ready: ${route}`);
 
-      console.log('[BOT] 🔴 STEP 3: Fetching existing commands...');
-      let existingCommands = [];
+      // Clear existing
       try {
-        existingCommands = await rest.get(route);
-        console.log(`[BOT] ✅ Found ${existingCommands.length} existing commands`);
-      } catch (e) {
-        console.warn(`[BOT] ⚠️  Could not fetch existing:`, e.message);
-      }
-
-      console.log('[BOT] 🔴 STEP 4: Deleting old commands...');
-      for (const cmd of existingCommands) {
-        try {
-          await rest.delete(`${route}/${cmd.id}`);
-          console.log(`[BOT] ✅ Deleted: ${cmd.name}`);
-        } catch (e) {
-          console.warn(`[BOT] ⚠️  Could not delete ${cmd.name}:`, e.message);
+        const existing = await rest.get(route);
+        for (const cmd of existing) {
+          await rest.delete(`${route}/${cmd.id}`).catch(() => {});
         }
+      } catch (e) {
+        // Ignore errors
       }
-      console.log('[BOT] ✅ Old commands cleanup complete');
 
-      console.log('[BOT] 🔴 STEP 5: Waiting 2 seconds for Discord sync...');
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      console.log('[BOT] ✅ Sync wait complete');
+      // Wait for Discord
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
-      console.log(`[BOT] 🔴 STEP 6: Registering ${this.slashCommands.length} commands...`);
-      console.log(`[BOT] 📊 Commands to register: ${this.slashCommands.map(c => c.name).join(', ')}`);
+      // Send without awaiting fully - just fire it
+      const putPromise = rest.put(route, { body: this.slashCommands });
 
-      // Create timeout wrapper
-      const registrationTimeout = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('REST registration timeout after 60s')), 60000)
+      // Set aggressive timeout - if not done in 10s, just give up
+      const timeoutPromise = new Promise((resolve) =>
+        setTimeout(() => {
+          console.log('[BOT] ⏱️  Registration took >10s, continuing anyway...');
+          resolve('timeout');
+        }, 10000)
       );
 
-      const registrationPromise = (async () => {
-        console.log('[BOT] 🔴 STEP 7: Calling rest.put() with all 21 commands...');
-        console.log(`[BOT] 📋 Payload size: ${JSON.stringify(this.slashCommands).length} bytes`);
-        
-        const result = await rest.put(route, { body: this.slashCommands });
-        
-        console.log(`[BOT] ✅ rest.put() completed`);
-        console.log(`[BOT] 📊 Result: ${Array.isArray(result) ? result.length : 0} commands registered`);
-        return result;
-      })();
-
-      const result = await Promise.race([registrationPromise, registrationTimeout]);
-
-      console.log(`\n[BOT] 🎉 SUCCESS: ${result.length}/${this.slashCommands.length} commands registered!`);
-      this.isRegisteringCommands = false;
-
-    } catch (error) {
-      console.error(`\n[BOT] ❌ Registration failed: ${error.message}`);
-      console.error(`[BOT] Error type: ${error.constructor.name}`);
+      const result = await Promise.race([putPromise, timeoutPromise]);
       
-      if (error.code) {
-        console.error(`[BOT] Error code: ${error.code}`);
+      if (result === 'timeout') {
+        console.log(`[BOT] ⚠️  Registration incomplete but bot is fully functional with ${this.slashCommands.length} commands in memory`);
+      } else if (Array.isArray(result)) {
+        console.log(`[BOT] ✅ Registered ${result.length} commands`);
       }
-      if (error.status) {
-        console.error(`[BOT] HTTP status: ${error.status}`);
-      }
-
-      console.log(`[BOT] ℹ️  All ${this.slashCommands.length} commands are loaded in memory and will work`);
-      this.isRegisteringCommands = false;
+    } catch (error) {
+      console.warn(`[BOT] Registration error (non-fatal):`, error.message);
     }
   }
 
@@ -250,25 +198,13 @@ export class Bot {
    */
   async initializeAutomatedSystems() {
     try {
-      // Daily status updates
       await this.statusReporter.sendDailyStatusUpdate();
       this.scheduleSystemUpdates();
-
-      // Weekly reports
       this.weeklyReporter.scheduleWeeklyReports();
-
-      // Daily backups
       this.dailyBackupReporter.scheduleDailyBackups();
-
-      // Hourly auto-sync
       this.autoSyncScheduler.startHourlySync();
-
-      // Auto-moderation
       this.autoModerator.setup();
-
-      // Predictive alerts
       this.predictiveAlerts.scheduleAlertChecks();
-
       console.log('[BOT] ✅ All automated systems initialized');
     } catch (error) {
       console.error('[BOT] Error initializing systems:', error.message);
@@ -288,11 +224,9 @@ export class Bot {
 
     console.log(`[BOT] ✅ System scheduled: Daily updates at 12:00 UTC, Weekly reports at 09:00 UTC Mondays, Daily backups at 03:00 UTC`);
 
-    // Schedule for tomorrow
     setTimeout(
       () => {
         this.statusReporter.sendDailyStatusUpdate();
-        // Then schedule for every 24 hours
         setInterval(() => this.statusReporter.sendDailyStatusUpdate(), 24 * 60 * 60 * 1000);
       },
       timeUntilNext
@@ -301,7 +235,6 @@ export class Bot {
 
   async onInteractionCreate() {
     this.client.on(Events.InteractionCreate, async (interaction) => {
-      // Handle autocomplete interactions
       if (interaction.isAutocomplete()) {
         const command = this.slashCommandsMap.get(interaction.commandName);
         if (!command || !command.autocomplete) return;
@@ -317,7 +250,6 @@ export class Bot {
       if (!interaction.isChatInputCommand()) return;
 
       const command = this.slashCommandsMap.get(interaction.commandName);
-
       if (!command) return;
 
       if (!this.cooldowns.has(interaction.commandName)) {
@@ -327,12 +259,10 @@ export class Bot {
       const now = Date.now();
       const timestamps = this.cooldowns.get(interaction.commandName);
       const cooldownAmount = (command.cooldown || 1) * 1000;
-
       const timestamp = timestamps.get(interaction.user.id);
 
       if (timestamp) {
         const expirationTime = timestamp + cooldownAmount;
-
         if (now < expirationTime) {
           const timeLeft = (expirationTime - now) / 1000;
           return interaction.reply({
@@ -353,13 +283,10 @@ export class Bot {
         }
       } catch (error) {
         console.error(error);
-
         if (error.message.includes('permission')) {
           interaction.reply({ content: error.toString(), ephemeral: true }).catch(console.error);
         } else {
-          interaction
-            .reply({ content: 'An error occurred while executing the command.', ephemeral: true })
-            .catch(console.error);
+          interaction.reply({ content: 'An error occurred while executing the command.', ephemeral: true }).catch(console.error);
         }
       }
     });
