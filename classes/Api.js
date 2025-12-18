@@ -152,12 +152,12 @@ export class Api {
           data: response.data, 
           error: `HTTP ${response.status}` 
         };
-    } catch (error) {
+      } catch (error) {
         const errorStatus = error.response?.status || error.status || 'N/A';
         const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Unknown error';
         const errorData = error.response?.data || error.data;
         
-        console.error(`[API GET] ❌ Error [${attemptCount}/${maxAttempts}]: Status ${errorStatus}, Message: ${errorMessage}`);
+        console.error(`[API GET] ❌ Error [${i + 1}/${uniqueVariations.length}]: Status ${errorStatus}, Message: ${errorMessage}`);
         if (errorData && typeof errorData === 'object') {
           console.error(`[API GET] Error details:`, JSON.stringify(errorData, null, 2).substring(0, 300));
         }
@@ -168,15 +168,14 @@ export class Api {
           message: errorMessage
         };
         
-        // Continue to next variation (will continue inner loop, then outer loop)
+        // Continue to next variation
         console.log(`[API GET] ⏭️  Trying next variation...`);
         continue;
       }
-      } // End inner loop (endpointVariations)
-    } // End outer loop (baseUrls)
+    }
     
     // If we get here, all attempts failed
-    console.error(`[API GET] ❌ All ${maxAttempts} attempts failed for: ${endpoint}`);
+    console.error(`[API GET] ❌ All ${uniqueVariations.length} attempts failed for: ${endpoint}`);
     console.error(`[API GET] Final error - Status: ${lastError.status}, Message: ${lastError.message}`);
     if (lastError.data) {
       const errorPreview = typeof lastError.data === 'string' 
