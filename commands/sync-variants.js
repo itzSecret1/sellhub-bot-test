@@ -141,6 +141,8 @@ export default {
 
       // STEP 2: Process each product's variants
       console.log(`[SYNC] === STEP 2: Processing product variants ===`);
+      const variantsToFetchStock = []; // Store variants that need stock fetched
+      
       for (const product of productList) {
         try {
           const variantMap = {};
@@ -153,15 +155,31 @@ export default {
               let variantId, variantName, variantStock;
               
               if (typeof variant === 'string') {
-                // Variant is just an ID string - we'll get details from invoices or skip
+                // Variant is just an ID string - we need to fetch stock from deliverables
                 variantId = variant;
                 variantName = `Variant ${variantId}`;
-                variantStock = 0;
+                variantStock = 0; // Will be updated after fetching from deliverables
+                
+                // Add to list to fetch stock later
+                variantsToFetchStock.push({
+                  productId: product.id,
+                  productName: product.name,
+                  variantId: variantId,
+                  variantName: variantName
+                });
               } else if (variant && variant.id) {
-                // Variant is an object
+                // Variant is an object - may have stock, but we'll verify with deliverables
                 variantId = variant.id.toString();
                 variantName = variant.name || `Variant ${variant.id}`;
-                variantStock = variant.stock || 0;
+                variantStock = variant.stock || 0; // Initial stock, will verify with deliverables
+                
+                // Even if variant has stock property, fetch real stock from deliverables
+                variantsToFetchStock.push({
+                  productId: product.id,
+                  productName: product.name,
+                  variantId: variantId,
+                  variantName: variantName
+                });
               } else {
                 // Skip invalid variant
                 continue;
@@ -171,14 +189,8 @@ export default {
                 variantMap[variantId] = {
                   id: variantId,
                   name: variantName,
-                  stock: variantStock
+                  stock: variantStock // Will be updated after fetching
                 };
-
-                variantsList.push({
-                  productName: product.name,
-                  variantName: variantName,
-                  stock: variantStock
-                });
 
                 processedVariantIds.add(variantId);
                 totalVariants++;
@@ -202,6 +214,52 @@ export default {
           processedProducts++;
         }
       }
+
+      // STEP 2.5: Fetch real stock from deliverables for all variants
+      console.log(`[SYNC] === STEP 2.5: Fetching real stock from deliverables ===`);
+      console.log(`[SYNC] 📦 Fetching stock for ${variantsToFetchStock.length} variants...`);
+      
+      let stockFetched = 0;
+      for (const variantInfo of variantsToFetchStock) {
+        try {
+          // Small delay to respect rate limits
+          if (stockFetched > 0 && stockFetched % 10 === 0) {
+            await new Promise(resolve => setTimeout(resolve, 2000)); // 2s delay every 10 requests
+          }
+          
+          const deliverablesData = await api.get(
+            `shops/${api.shopId}/products/${variantInfo.productId}/deliverables/${variantInfo.variantId}`
+          );
+          
+          const items = parseDeliverables(deliverablesData);
+          const realStock = items.length;
+          
+          // Update stock in allVariants
+          const productIdStr = variantInfo.productId.toString();
+          if (allVariants[productIdStr] && allVariants[productIdStr].variants[variantInfo.variantId]) {
+            allVariants[productIdStr].variants[variantInfo.variantId].stock = realStock;
+            
+            // Update variantsList for display
+            const variantInList = variantsList.find(v => 
+              v.productName === variantInfo.productName && 
+              v.variantName === variantInfo.variantName
+            );
+            if (variantInList) {
+              variantInList.stock = realStock;
+            }
+          }
+          
+          stockFetched++;
+          if (stockFetched % 50 === 0) {
+            console.log(`[SYNC] 📦 Fetched stock for ${stockFetched}/${variantsToFetchStock.length} variants...`);
+          }
+        } catch (e) {
+          console.error(`[SYNC] Error fetching stock for ${variantInfo.productId}/${variantInfo.variantId}:`, e.message);
+          // Continue with next variant
+        }
+      }
+      
+      console.log(`[SYNC] ✅ Fetched real stock for ${stockFetched} variants`);
 
       // STEP 3: Discover missing variants from invoices (with pagination)
       console.log(`[SYNC] === STEP 3: Discovering variants from invoices ===`);
