@@ -15,18 +15,32 @@ export default {
   requiredRole: 'admin',
 
   async execute(interaction, api) {
-    // CRITICAL: Defer reply FIRST to prevent timeout
+    // CRITICAL: Defer reply IMMEDIATELY to prevent timeout (3 second limit)
+    let deferred = false;
     try {
       if (!interaction.deferred && !interaction.replied) {
         await interaction.deferReply({ ephemeral: true });
+        deferred = true;
+        console.log(`[SYNC] ✅ Deferred reply immediately`);
       }
     } catch (deferError) {
-      console.error(`[SYNC] Failed to defer reply: ${deferError.message}`);
-      return;
+      console.error(`[SYNC] ❌ Failed to defer reply: ${deferError.message}`);
+      // Try to send a quick reply instead
+      try {
+        await interaction.reply({ content: '⏳ Sincronizando...', ephemeral: true });
+        deferred = true;
+      } catch (replyError) {
+        console.error(`[SYNC] ❌ Also failed to reply: ${replyError.message}`);
+        return;
+      }
     }
     
+    // Log command asynchronously (don't wait for it)
+    AdvancedCommandLogger.logCommand(interaction, 'sync-variants').catch(err => {
+      console.error(`[SYNC] Logging error (non-critical): ${err.message}`);
+    });
+    
     try {
-      await AdvancedCommandLogger.logCommand(interaction, 'sync-variants');
 
       const startTime = Date.now();
       const allVariants = {};
