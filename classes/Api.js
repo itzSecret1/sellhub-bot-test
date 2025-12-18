@@ -11,35 +11,63 @@ export class Api {
   }
 
   async get(endpoint, params = {}) {
-    // Try multiple endpoint structures
+    // Try multiple endpoint structures and base URLs
+    // First, try different base URLs
+    const baseUrls = [
+      'https://snakessh.sellhub.cx/api/',
+      'https://dash.sellhub.cx/api/',
+      'https://api.sellhub.cx/',
+      'https://snakessh.sellhub.cx/'
+    ];
+    
+    // Then try different endpoint structures
     const endpointVariations = [
-      endpoint, // Original
+      endpoint, // Original: shops/{shopId}/products
+      endpoint.replace(`shops/${this.shopId}/`, ''), // Remove shops/{shopId}/: products
+      `products`, // Just products (if endpoint contains products)
+      `invoices`, // Just invoices (if endpoint contains invoices)
+      `${this.shopId}/${endpoint.replace(`shops/${this.shopId}/`, '')}`, // shopId/products
+      `shops/${this.shopId}/${endpoint.replace(`shops/${this.shopId}/`, '')}`, // shops/shopId/products (redundant but try)
       `sellhub/${endpoint}`, // With sellhub prefix
       `v1/${endpoint}`, // With v1 prefix
-      `sellhub/v1/${endpoint}` // With both prefixes
+      `sellhub/v1/${endpoint}`, // With both prefixes
+      `api/${endpoint}`, // With api prefix
+      `api/v1/${endpoint}` // With api/v1 prefix
     ];
 
     let lastError = null;
+    let attemptCount = 0;
+    const maxAttempts = baseUrls.length * endpointVariations.length;
     
-    for (let i = 0; i < endpointVariations.length; i++) {
-      const endpointVar = endpointVariations[i];
-      try {
-        const url = `${this.baseUrl}${endpointVar}`;
-        const fullUrl = params && Object.keys(params).length > 0 
-          ? `${url}?${new URLSearchParams(params).toString()}`
-          : url;
-        console.log(`[API GET] [${i + 1}/${endpointVariations.length}] Trying: ${fullUrl}`);
-        console.log(`[API GET] Headers: Authorization=${this.apiKey.substring(0, 20)}..., X-API-Key=${this.apiKey.substring(0, 20)}...`);
+    // Try each base URL with each endpoint variation
+    for (const baseUrl of baseUrls) {
+      for (let i = 0; i < endpointVariations.length; i++) {
+        const endpointVar = endpointVariations[i];
+        attemptCount++;
         
-        const response = await axios.get(url, {
-          headers: { 
-            'Authorization': this.apiKey,
-            'X-API-Key': this.apiKey
-          },
-          params: params,
-          timeout: 15000,
-          validateStatus: (status) => status < 500 // Don't throw on 4xx, we'll handle it
-        });
+        // Skip if endpoint doesn't make sense for this variation
+        if (endpoint.includes('products') && endpointVar === 'invoices') continue;
+        if (endpoint.includes('invoices') && endpointVar === 'products') continue;
+        
+        try {
+          const url = `${baseUrl}${endpointVar}`;
+          const fullUrl = params && Object.keys(params).length > 0 
+            ? `${url}?${new URLSearchParams(params).toString()}`
+            : url;
+          console.log(`[API GET] [${attemptCount}/${maxAttempts}] Trying: ${fullUrl}`);
+          console.log(`[API GET] Base: ${baseUrl}, Endpoint: ${endpointVar}`);
+          console.log(`[API GET] Headers: Authorization=${this.apiKey.substring(0, 20)}..., X-API-Key=${this.apiKey.substring(0, 20)}...`);
+          
+          const response = await axios.get(url, {
+            headers: { 
+              'Authorization': this.apiKey,
+              'X-API-Key': this.apiKey,
+              'Accept': 'application/json'
+            },
+            params: params,
+            timeout: 15000,
+            validateStatus: (status) => status < 500 // Don't throw on 4xx, we'll handle it
+          });
 
         console.log(`[API GET] Response status: ${response.status}`);
         console.log(`[API GET] Response content-type: ${response.headers['content-type'] || 'unknown'}`);
@@ -64,8 +92,14 @@ export class Api {
           }
         }
         
-        // If we get a successful response, cache this endpoint structure
+        // If we get a successful response, cache this endpoint structure and base URL
         if (response.status === 200 || response.status === 201) {
+          // Cache the working base URL
+          if (baseUrl !== this.baseUrl) {
+            this.baseUrl = baseUrl;
+            console.log(`[API] ✅ Found working base URL: ${baseUrl}`);
+          }
+          
           if (!this.endpointPrefix && endpointVar !== endpoint) {
             // Extract the prefix that worked
             const prefix = endpointVar.replace(endpoint, '').replace(/\/$/, '');
@@ -125,25 +159,27 @@ export class Api {
           message: errorMessage
         };
         
-        // If it's the last variation, throw the error
-        if (i === endpointVariations.length - 1) {
-          console.error(`[API GET] ❌ All ${endpointVariations.length} variations failed for: ${endpoint}`);
-          console.error(`[API GET] Final error - Status: ${lastError.status}, Message: ${lastError.message}`);
-          if (lastError.data) {
-            console.error(`[API GET] Final error data:`, JSON.stringify(lastError.data, null, 2).substring(0, 500));
-          }
-          throw { 
-            message: 'Invalid response', 
-            status: lastError.status, 
-            data: lastError.data, 
-            error: lastError.message 
-          };
-        }
-        // Otherwise, continue to next variation
+        // Continue to next variation
         console.log(`[API GET] ⏭️  Trying next variation...`);
         continue;
       }
     }
+    
+    // If we get here, all attempts failed
+    console.error(`[API GET] ❌ All ${maxAttempts} attempts failed for: ${endpoint}`);
+    console.error(`[API GET] Final error - Status: ${lastError.status}, Message: ${lastError.message}`);
+    if (lastError.data) {
+      const errorPreview = typeof lastError.data === 'string' 
+        ? lastError.data.substring(0, 500)
+        : JSON.stringify(lastError.data, null, 2).substring(0, 500);
+      console.error(`[API GET] Final error data:`, errorPreview);
+    }
+    throw { 
+      message: 'Invalid response - all endpoint variations failed', 
+      status: lastError.status, 
+      data: lastError.data, 
+      error: lastError.message 
+    };
   }
 
   async post(endpoint, data) {
