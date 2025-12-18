@@ -3,7 +3,7 @@ import { config } from '../utils/config.js';
 
 export class Api {
   constructor() {
-    this.baseUrl = 'https://api.sellhub.cx/v1/';
+    this.baseUrl = 'https://dash.sellhub.cx/api/';
     this.apiKey = config.SH_API_KEY;
     this.shopId = config.SH_SHOP_ID;
   }
@@ -11,7 +11,7 @@ export class Api {
   async get(endpoint, params = {}) {
     try {
       const response = await axios.get(`${this.baseUrl}${endpoint}`, {
-        headers: { Authorization: `Bearer ${this.apiKey}` },
+        headers: { Authorization: this.apiKey },
         params: params,
         timeout: 15000
       });
@@ -28,7 +28,7 @@ export class Api {
     try {
       const response = await axios.post(`${this.baseUrl}${endpoint}`, data, {
         headers: {
-          Authorization: `Bearer ${this.apiKey}`,
+          Authorization: this.apiKey,
           'Content-Type': 'application/json'
         },
         timeout: 10000
@@ -46,7 +46,7 @@ export class Api {
     try {
       const response = await axios.put(`${this.baseUrl}${endpoint}`, data, {
         headers: {
-          Authorization: `Bearer ${this.apiKey}`,
+          Authorization: this.apiKey,
           'Content-Type': 'application/json'
         },
         timeout: 10000
@@ -63,7 +63,7 @@ export class Api {
   async delete(endpoint) {
     try {
       const response = await axios.delete(`${this.baseUrl}${endpoint}`, {
-        headers: { Authorization: `Bearer ${this.apiKey}` },
+        headers: { Authorization: this.apiKey },
         timeout: 10000
       });
       return response.data;
