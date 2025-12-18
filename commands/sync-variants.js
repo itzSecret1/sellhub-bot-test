@@ -16,6 +16,43 @@ export default {
   requiredRole: 'admin',
 
   async execute(interaction, api) {
+    // CRITICAL: Verify we're using SellHub API, not SellAuth
+    if (api.baseUrl && api.baseUrl.includes('sellauth')) {
+      await interaction.reply({
+        content: '❌ ERROR: El bot está configurado para usar SellAuth en lugar de SellHub. Verifica las variables de entorno.',
+        ephemeral: true
+      });
+      return;
+    }
+    
+    // CRITICAL: Check and clean old SellAuth data from cache
+    const oldData = loadVariantsData();
+    if (Object.keys(oldData).length > 0) {
+      // Check if data looks like SellAuth (has numeric IDs instead of UUIDs, or old structure)
+      const firstProduct = Object.values(oldData)[0];
+      if (firstProduct) {
+        const productId = firstProduct.productId;
+        // SellHub uses UUIDs (strings with dashes), SellAuth might use numbers
+        // Also check if shop ID matches
+        const isOldData = typeof productId === 'number' || 
+                         (typeof productId === 'string' && !productId.includes('-') && productId.length < 10);
+        
+        if (isOldData) {
+          console.log('[SYNC] ⚠️  Detected old SellAuth data in cache - will be overwritten with SellHub data');
+          // Delete old cache file
+          try {
+            if (existsSync(variantsDataPath)) {
+              const { unlinkSync } = await import('fs');
+              unlinkSync(variantsDataPath);
+              console.log('[SYNC] ✅ Deleted old SellAuth cache file');
+            }
+          } catch (e) {
+            console.error('[SYNC] Error deleting old cache:', e.message);
+          }
+        }
+      }
+    }
+    
     // CRITICAL: Defer reply IMMEDIATELY to prevent timeout (3 second limit)
     let deferred = false;
     try {
