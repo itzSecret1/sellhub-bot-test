@@ -47,18 +47,34 @@ export class Bot {
       // Wait a bit to ensure client is fully ready
       await new Promise(r => setTimeout(r, 2000));
       
-      // Check registered commands and register if needed (only once)
+      // Check registered commands and try to register if needed
       try {
         const guild = await this.client.guilds.fetch(config.BOT_GUILD_ID);
         const registered = await guild.commands.fetch();
-        const expectedCount = 34; // Update this if you add/remove commands
+        const expectedCount = 35; // Update this if you add/remove commands
         
         console.log(`[BOT] 📊 Currently registered: ${registered.size} commands`);
         
-        if (registered.size < expectedCount / 2) {
+        if (registered.size < 5) {
           console.log(`[BOT] ⚠️  Only ${registered.size} commands registered (expected ~${expectedCount})`);
-          console.log(`[BOT] 💡 Use /register-commands (if available) or run: node register-commands.js`);
-          console.log(`[BOT] 📝 Note: Commands will work but may not appear in Discord autocomplete`);
+          console.log(`[BOT] 🔄 Attempting to register missing commands...`);
+          
+          // Try to register commands automatically (one time attempt)
+          try {
+            await this.registerSlashCommands();
+          } catch (e) {
+            if (e.code === 30034) {
+              console.log(`[BOT] ❌ RATE LIMIT: Discord is blocking registration`);
+              console.log(`[BOT] 💡 SOLUTIONS:`);
+              console.log(`[BOT]    1. Wait 24-48 hours`);
+              console.log(`[BOT]    2. Create NEW bot token in Discord Developer Portal`);
+              console.log(`[BOT]    3. Update BOT_TOKEN in Railway and redeploy`);
+              console.log(`[BOT]    4. Run: node check-rate-limit.js to verify`);
+            } else {
+              console.log(`[BOT] ⚠️  Registration failed: ${e.message}`);
+              console.log(`[BOT] 💡 Run: node register-commands.js manually`);
+            }
+          }
         } else {
           console.log(`[BOT] ✅ Commands registered: ${registered.size}`);
         }
