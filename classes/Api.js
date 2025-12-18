@@ -25,7 +25,11 @@ export class Api {
       const endpointVar = endpointVariations[i];
       try {
         const url = `${this.baseUrl}${endpointVar}`;
-        console.log(`[API GET] Trying: ${url}`);
+        const fullUrl = params && Object.keys(params).length > 0 
+          ? `${url}?${new URLSearchParams(params).toString()}`
+          : url;
+        console.log(`[API GET] [${i + 1}/${endpointVariations.length}] Trying: ${fullUrl}`);
+        console.log(`[API GET] Headers: Authorization=${this.apiKey.substring(0, 20)}..., X-API-Key=${this.apiKey.substring(0, 20)}...`);
         
         const response = await axios.get(url, {
           headers: { 
@@ -37,24 +41,40 @@ export class Api {
           validateStatus: (status) => status < 500 // Don't throw on 4xx, we'll handle it
         });
 
+        console.log(`[API GET] Response status: ${response.status}`);
+        console.log(`[API GET] Response headers:`, JSON.stringify(response.headers, null, 2).substring(0, 200));
+        
         // If we get a successful response, cache this endpoint structure
         if (response.status === 200 || response.status === 201) {
           if (!this.endpointPrefix && endpointVar !== endpoint) {
             // Extract the prefix that worked
             const prefix = endpointVar.replace(endpoint, '').replace(/\/$/, '');
             this.endpointPrefix = prefix ? `${prefix}/` : '';
-            console.log(`[API] Found working endpoint prefix: ${this.endpointPrefix || 'none'}`);
+            console.log(`[API] ✅ Found working endpoint prefix: ${this.endpointPrefix || 'none'}`);
           }
+          
+          const dataType = Array.isArray(response.data) ? 'array' : typeof response.data;
+          const dataSize = Array.isArray(response.data) ? response.data.length : 
+                          (response.data?.data && Array.isArray(response.data.data)) ? response.data.data.length :
+                          'unknown';
+          console.log(`[API GET] ✅ Success! Response type: ${dataType}, Size: ${dataSize}`);
+          if (dataSize > 0 && dataSize < 10) {
+            console.log(`[API GET] Sample data:`, JSON.stringify(response.data, null, 2).substring(0, 500));
+          }
+          
           return response.data;
         }
 
         // If 404, try next variation
         if (response.status === 404) {
+          console.log(`[API GET] ❌ 404 Not Found - trying next variation...`);
           lastError = { status: 404, data: response.data, message: 'Not found' };
           continue;
         }
 
         // Other errors, throw
+        console.error(`[API GET] ❌ Error status ${response.status}`);
+        console.error(`[API GET] Response data:`, JSON.stringify(response.data, null, 2).substring(0, 500));
         throw { 
           message: 'Invalid response', 
           status: response.status, 
@@ -62,16 +82,28 @@ export class Api {
           error: `HTTP ${response.status}` 
         };
       } catch (error) {
+        const errorStatus = error.response?.status || error.status || 'N/A';
+        const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Unknown error';
+        const errorData = error.response?.data || error.data;
+        
+        console.error(`[API GET] ❌ Error [${i + 1}/${endpointVariations.length}]: Status ${errorStatus}, Message: ${errorMessage}`);
+        if (errorData && typeof errorData === 'object') {
+          console.error(`[API GET] Error details:`, JSON.stringify(errorData, null, 2).substring(0, 300));
+        }
+        
         lastError = {
-          status: error.response?.status || error.status,
-          data: error.response?.data || error.data,
-          message: error.message || error.error
+          status: errorStatus,
+          data: errorData,
+          message: errorMessage
         };
         
         // If it's the last variation, throw the error
         if (i === endpointVariations.length - 1) {
-          console.error(`[API GET] All variations failed for: ${endpoint}`);
-          console.error(`[API GET] Last error - Status: ${lastError.status}`, lastError.data);
+          console.error(`[API GET] ❌ All ${endpointVariations.length} variations failed for: ${endpoint}`);
+          console.error(`[API GET] Final error - Status: ${lastError.status}, Message: ${lastError.message}`);
+          if (lastError.data) {
+            console.error(`[API GET] Final error data:`, JSON.stringify(lastError.data, null, 2).substring(0, 500));
+          }
           throw { 
             message: 'Invalid response', 
             status: lastError.status, 
@@ -80,6 +112,7 @@ export class Api {
           };
         }
         // Otherwise, continue to next variation
+        console.log(`[API GET] ⏭️  Trying next variation...`);
         continue;
       }
     }

@@ -58,8 +58,18 @@ export default {
       while (hasMoreProducts && page <= 50) {
         try {
           // Fetch products from SellHub API
-          const products = await api.get(`shops/${api.shopId}/products?limit=100&page=${page}`);
+          console.log(`[SYNC] 📡 Fetching products page ${page}...`);
+          const products = await api.get(`shops/${api.shopId}/products`, { limit: 100, page: page });
+          
+          console.log(`[SYNC] 📦 Raw API response type: ${Array.isArray(products) ? 'array' : typeof products}`);
+          console.log(`[SYNC] 📦 Raw API response keys: ${products ? Object.keys(products).join(', ') : 'null'}`);
+          
           const pageProducts = Array.isArray(products) ? products : products?.data || [];
+          console.log(`[SYNC] 📦 Parsed products count: ${pageProducts.length}`);
+          
+          if (pageProducts.length > 0) {
+            console.log(`[SYNC] 📦 First product sample:`, JSON.stringify(pageProducts[0], null, 2).substring(0, 300));
+          }
 
           if (pageProducts.length === 0) {
             hasMoreProducts = false;
