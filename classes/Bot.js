@@ -44,6 +44,13 @@ export class Bot {
 
     this.client.on('ready', async () => {
       console.log(`${this.client.user.username} ready!`);
+      
+      // CRITICAL: Load commands FIRST before anything else
+      console.log(`[BOT] 🔄 Loading commands into memory...`);
+      await this.registerSlashCommands();
+      console.log(`[BOT] ✅ Commands loaded: ${this.slashCommandsMap.size} commands in map`);
+      console.log(`[BOT] 📝 Command names: ${Array.from(this.slashCommandsMap.keys()).join(', ')}`);
+      
       // Wait a bit to ensure client is fully ready
       await new Promise(r => setTimeout(r, 2000));
       
@@ -53,13 +60,33 @@ export class Bot {
         const registered = await guild.commands.fetch();
         const expectedCount = 35; // Update this if you add/remove commands
         
-        // Check for duplicates
+        // Check for duplicates and clean them automatically
         const commandNames = Array.from(registered.values()).map(c => c.name);
         const uniqueNames = new Set(commandNames);
         if (commandNames.length !== uniqueNames.size) {
           const duplicates = commandNames.filter((name, index) => commandNames.indexOf(name) !== index);
-          console.log(`[BOT] ⚠️  WARNING: Found duplicate commands: ${[...new Set(duplicates)].join(', ')}`);
-          console.log(`[BOT] 💡 Run: node clean-duplicate-commands.js to remove duplicates`);
+          const duplicateNames = [...new Set(duplicates)];
+          console.log(`[BOT] ⚠️  WARNING: Found ${duplicateNames.length} duplicate commands: ${duplicateNames.join(', ')}`);
+          console.log(`[BOT] 🧹 Cleaning duplicates automatically...`);
+          
+          // Clean duplicates - keep the first one, delete the rest
+          const seen = new Set();
+          let deleted = 0;
+          for (const cmd of registered.values()) {
+            if (seen.has(cmd.name)) {
+              try {
+                await guild.commands.delete(cmd.id);
+                deleted++;
+                console.log(`[BOT] ✅ Deleted duplicate: /${cmd.name} (ID: ${cmd.id})`);
+                await new Promise(r => setTimeout(r, 200)); // Rate limit protection
+              } catch (e) {
+                console.error(`[BOT] ❌ Failed to delete duplicate /${cmd.name}: ${e.message}`);
+              }
+            } else {
+              seen.add(cmd.name);
+            }
+          }
+          console.log(`[BOT] ✅ Cleaned ${deleted} duplicate commands`);
         }
         
         console.log(`[BOT] 📊 Currently registered: ${registered.size} commands (${uniqueNames.size} unique)`);
@@ -156,10 +183,16 @@ export class Bot {
             if (!this.slashCommandsMap.has(cmdName)) {
               this.slashCommands.push(command.default.data.toJSON());
               this.slashCommandsMap.set(cmdName, command.default);
+              console.log(`[BOT] ✅ Loaded command: ${cmdName} from ${file}`);
+            } else {
+              console.log(`[BOT] ⚠️  Duplicate command name skipped: ${cmdName} from ${file}`);
             }
+          } else {
+            console.log(`[BOT] ⚠️  Invalid command structure in ${file}`);
           }
         } catch (err) {
-          console.error(`[BOT] Error loading ${file}:`, err.message);
+          console.error(`[BOT] ❌ Error loading ${file}:`, err.message);
+          console.error(`[BOT]    Stack:`, err.stack?.split('\n').slice(0, 3).join('\n'));
         }
       }
 
@@ -427,9 +460,18 @@ export class Bot {
 
       if (!interaction.isChatInputCommand()) return;
       
+      console.log(`[BOT] 📥 Command received: /${interaction.commandName} from ${interaction.user.username}`);
+      console.log(`[BOT] 🔍 Available commands in map: ${Array.from(this.slashCommandsMap.keys()).join(', ')}`);
+      
       const command = this.slashCommandsMap.get(interaction.commandName);
       if (!command) {
-        console.log(`[BOT] ⚠️  Command not found: ${interaction.commandName}`);
+        console.error(`[BOT] ❌ Command not found: ${interaction.commandName}`);
+        console.error(`[BOT]    Map size: ${this.slashCommandsMap.size}`);
+        console.error(`[BOT]    Command names in map: ${Array.from(this.slashCommandsMap.keys()).join(', ')}`);
+        await interaction.reply({ 
+          content: `❌ Error: Comando "${interaction.commandName}" no encontrado. El bot puede estar reiniciándose.`, 
+          ephemeral: true 
+        }).catch(() => {});
         return;
       }
       
