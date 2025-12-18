@@ -59,6 +59,8 @@ export default {
         try {
           // Fetch products from SellHub API
           console.log(`[SYNC] 📡 Fetching products page ${page}...`);
+          console.log(`[SYNC] 📡 Endpoint: shops/${api.shopId}/products`);
+          console.log(`[SYNC] 📡 Params: limit=100, page=${page}`);
           const products = await api.get(`shops/${api.shopId}/products`, { limit: 100, page: page });
           
           console.log(`[SYNC] 📦 Raw API response type: ${Array.isArray(products) ? 'array' : typeof products}`);

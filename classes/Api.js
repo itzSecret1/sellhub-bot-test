@@ -42,7 +42,27 @@ export class Api {
         });
 
         console.log(`[API GET] Response status: ${response.status}`);
-        console.log(`[API GET] Response headers:`, JSON.stringify(response.headers, null, 2).substring(0, 200));
+        console.log(`[API GET] Response content-type: ${response.headers['content-type'] || 'unknown'}`);
+        console.log(`[API GET] Response size: ${JSON.stringify(response.data || '').length} bytes`);
+        
+        // Log response data structure
+        if (response.data) {
+          const dataType = Array.isArray(response.data) ? 'array' : typeof response.data;
+          const dataKeys = response.data && typeof response.data === 'object' && !Array.isArray(response.data) 
+            ? Object.keys(response.data).join(', ') 
+            : 'N/A';
+          console.log(`[API GET] Response data type: ${dataType}`);
+          if (dataKeys !== 'N/A') {
+            console.log(`[API GET] Response data keys: ${dataKeys}`);
+          }
+          
+          // If it's HTML (404 page), log first 200 chars
+          if (typeof response.data === 'string' && response.data.includes('<!DOCTYPE')) {
+            console.log(`[API GET] ⚠️  Received HTML response (404 page): ${response.data.substring(0, 200)}...`);
+          } else if (response.data && typeof response.data === 'object') {
+            console.log(`[API GET] Response preview:`, JSON.stringify(response.data, null, 2).substring(0, 800));
+          }
+        }
         
         // If we get a successful response, cache this endpoint structure
         if (response.status === 200 || response.status === 201) {
@@ -56,6 +76,7 @@ export class Api {
           const dataType = Array.isArray(response.data) ? 'array' : typeof response.data;
           const dataSize = Array.isArray(response.data) ? response.data.length : 
                           (response.data?.data && Array.isArray(response.data.data)) ? response.data.data.length :
+                          (response.data?.products && Array.isArray(response.data.products)) ? response.data.products.length :
                           'unknown';
           console.log(`[API GET] ✅ Success! Response type: ${dataType}, Size: ${dataSize}`);
           if (dataSize > 0 && dataSize < 10) {
@@ -67,7 +88,14 @@ export class Api {
 
         // If 404, try next variation
         if (response.status === 404) {
-          console.log(`[API GET] ❌ 404 Not Found - trying next variation...`);
+          console.log(`[API GET] ❌ 404 Not Found`);
+          if (response.data) {
+            const errorPreview = typeof response.data === 'string' 
+              ? response.data.substring(0, 200) 
+              : JSON.stringify(response.data, null, 2).substring(0, 200);
+            console.log(`[API GET] 404 Response preview: ${errorPreview}...`);
+          }
+          console.log(`[API GET] ⏭️  Trying next variation...`);
           lastError = { status: 404, data: response.data, message: 'Not found' };
           continue;
         }
