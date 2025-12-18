@@ -147,7 +147,7 @@ export class Bot {
       // Ensure client.user is available
       if (!this.client.user || !this.client.user.id) {
         console.error(`[BOT] ❌ Client user not available! Waiting...`);
-        await new Promise(r => setTimeout(r, 3000));
+        await new Promise(r => setTimeout(r, 2000));
         if (!this.client.user || !this.client.user.id) {
           console.error(`[BOT] ❌ Client user still not available after wait!`);
           this.isRegisteringCommands = false;
@@ -155,13 +155,13 @@ export class Bot {
         }
       }
 
-      const rest = new REST({ version: '10' }).setToken(config.BOT_TOKEN);
-      const guildId = config.BOT_GUILD_ID;
-      const clientId = this.client.user.id;
-      
-      console.log(`[BOT] 📋 Registering ${this.slashCommands.length} commands using REST API...`);
-      console.log(`[BOT] Client ID: ${clientId}, Guild ID: ${guildId}`);
-      
+      const guild = await this.client.guilds.fetch(config.BOT_GUILD_ID);
+      if (!guild) {
+        console.error(`[BOT] ❌ Guild not found: ${config.BOT_GUILD_ID}`);
+        this.isRegisteringCommands = false;
+        return;
+      }
+
       // Validate commands before registering
       const validCommands = [];
       for (const cmd of this.slashCommands) {
@@ -178,69 +178,99 @@ export class Bot {
         return;
       }
 
-      console.log(`[BOT] Registering ${validCommands.length} valid commands...`);
-
-      // Use REST API to register all commands at once (more reliable)
+      console.log(`[BOT] 📋 Registering ${validCommands.length} commands individually...`);
+      console.log(`[BOT] Guild: ${guild.name} (${guild.id})`);
+      
+      // Clear existing commands first (optional, but helps avoid duplicates)
       try {
-        const data = await rest.put(
-          Routes.applicationGuildCommands(clientId, guildId),
-          { body: validCommands }
-        );
-        
-        console.log(`[BOT] ✅ Successfully registered ${data.length} commands!`);
-        console.log(`[BOT] Registered commands: ${data.map(cmd => cmd.name).join(', ')}`);
-      } catch (error) {
-        console.error(`[BOT] ❌ Failed to register commands:`, error.message);
-        if (error.code === 50001) {
-          console.error(`[BOT] ❌ Missing Access - Bot needs 'applications.commands' scope!`);
-        } else if (error.code === 50025) {
-          console.error(`[BOT] ❌ Invalid Form Body - Check command structure!`);
-        } else if (error.code === 10004) {
-          console.error(`[BOT] ❌ Unknown Guild - Check BOT_GUILD_ID!`);
+        const existing = await guild.commands.fetch();
+        if (existing.size > 0) {
+          console.log(`[BOT] Found ${existing.size} existing commands, clearing...`);
+          for (const cmd of existing.values()) {
+            try {
+              await Promise.race([
+                guild.commands.delete(cmd.id),
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 5000))
+              ]);
+            } catch (e) {
+              // Ignore errors when deleting
+            }
+          }
+          console.log(`[BOT] ✅ Cleared existing commands`);
+          await new Promise(r => setTimeout(r, 1000));
         }
-        console.error(`[BOT] Error code: ${error.code}`);
-        console.error(`[BOT] Error details:`, error.rawError || error.message);
-        
-        // Fallback: try individual registration
-        console.log(`[BOT] 🔄 Trying individual registration as fallback...`);
-        await this.registerCommandsIndividually(validCommands);
-      }
-    } catch (error) {
-      console.error(`[BOT] ❌ Registration error:`, error.message);
-      console.error(`[BOT] Error stack:`, error.stack);
-    } finally {
-      this.isRegisteringCommands = false;
-    }
-  }
-
-  async registerCommandsIndividually(commands) {
-    try {
-      const guild = await this.client.guilds.fetch(config.BOT_GUILD_ID);
-      if (!guild) {
-        console.error(`[BOT] ❌ Guild not found: ${config.BOT_GUILD_ID}`);
-        return;
+      } catch (e) {
+        console.warn(`[BOT] ⚠️  Could not clear existing commands:`, e.message);
+        // Continue anyway
       }
 
       let success = 0;
       let failed = 0;
+      const errors = [];
       
-      for (let i = 0; i < commands.length; i++) {
-        const cmd = commands[i];
+      // Register commands one by one with proper rate limit handling
+      for (let i = 0; i < validCommands.length; i++) {
+        const cmd = validCommands[i];
+        
         try {
-          await guild.commands.create(cmd);
+          // Use Promise.race to add timeout protection
+          const created = await Promise.race([
+            guild.commands.create(cmd),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Command registration timeout (10s)')), 10000)
+            )
+          ]);
+          
           success++;
-          console.log(`[BOT] ✅ Created: ${cmd.name} (${i + 1}/${commands.length})`);
-          await new Promise(r => setTimeout(r, 300));
+          console.log(`[BOT] ✅ [${i + 1}/${validCommands.length}] Created: ${cmd.name}`);
+          
+          // Rate limit: wait between commands (Discord allows 5 commands per 5 seconds)
+          // Wait 1.2 seconds between commands to be safe
+          await new Promise(r => setTimeout(r, 1200));
+          
         } catch (err) {
           failed++;
-          console.error(`[BOT] ❌ Failed: ${cmd.name} - ${err.message}`);
-          await new Promise(r => setTimeout(r, 200));
+          const errorMsg = err.message || err.toString();
+          errors.push({ name: cmd.name, error: errorMsg });
+          
+          if (err.code === 50025) {
+            console.error(`[BOT] ❌ [${i + 1}/${validCommands.length}] Invalid command: ${cmd.name} - ${errorMsg}`);
+          } else if (err.code === 30034) {
+            console.error(`[BOT] ❌ [${i + 1}/${validCommands.length}] Rate limit hit for: ${cmd.name}`);
+            // Wait longer on rate limit
+            await new Promise(r => setTimeout(r, 5000));
+          } else {
+            console.error(`[BOT] ❌ [${i + 1}/${validCommands.length}] Failed: ${cmd.name} - ${errorMsg}`);
+          }
+          
+          // Wait before next command even on error
+          await new Promise(r => setTimeout(r, 800));
         }
       }
       
-      console.log(`[BOT] ✅ Individual registration: ${success}/${commands.length} commands (${failed} failed)`);
+      console.log(`\n[BOT] ✅ REGISTRATION COMPLETE: ${success}/${validCommands.length} commands registered`);
+      if (failed > 0) {
+        console.log(`[BOT] ⚠️  ${failed} commands failed to register`);
+        if (errors.length > 0) {
+          console.log(`[BOT] Failed commands:`, errors.slice(0, 5).map(e => `${e.name}: ${e.error}`).join(', '));
+        }
+      }
+      
+      // Verify registration
+      try {
+        const registered = await guild.commands.fetch();
+        console.log(`[BOT] ✅ Verified: ${registered.size} commands now available in Discord`);
+      } catch (e) {
+        console.warn(`[BOT] ⚠️  Could not verify commands:`, e.message);
+      }
+      
     } catch (error) {
-      console.error(`[BOT] ❌ Individual registration error:`, error.message);
+      console.error(`[BOT] ❌ Registration error:`, error.message);
+      if (error.stack) {
+        console.error(`[BOT] Stack:`, error.stack.split('\n').slice(0, 3).join('\n'));
+      }
+    } finally {
+      this.isRegisteringCommands = false;
     }
   }
 
