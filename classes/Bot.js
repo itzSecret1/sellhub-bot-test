@@ -134,45 +134,73 @@ export class Bot {
 
   async registerIndividualCommands() {
     try {
-      const rest = new REST({ version: '9' }).setToken(config.BOT_TOKEN);
+      if (!this.slashCommands || this.slashCommands.length === 0) {
+        console.error(`[BOT] ❌ No commands loaded! Cannot register.`);
+        this.isRegisteringCommands = false;
+        return;
+      }
+
       const guild = await this.client.guilds.fetch(config.BOT_GUILD_ID);
+      if (!guild) {
+        console.error(`[BOT] ❌ Guild not found: ${config.BOT_GUILD_ID}`);
+        this.isRegisteringCommands = false;
+        return;
+      }
       
       console.log(`[BOT] 📋 Using guild.commands.create() individually...`);
       console.log(`[BOT] Total commands to register: ${this.slashCommands.length}`);
       
-      // Clear first
+      // Clear first (but don't fail if this errors)
       try {
         const existing = await guild.commands.fetch();
-        console.log(`[BOT] Clearing ${existing.size} existing commands...`);
-        for (const cmd of existing.values()) {
-          await guild.commands.delete(cmd.id).catch(() => {});
+        console.log(`[BOT] Found ${existing.size} existing commands, clearing...`);
+        if (existing.size > 0) {
+          for (const cmd of existing.values()) {
+            await guild.commands.delete(cmd.id).catch((e) => {
+              console.warn(`[BOT] Failed to delete command ${cmd.name}:`, e.message);
+            });
+          }
+          console.log(`[BOT] ✅ Cleared existing commands`);
+          // Wait after clearing
+          await new Promise(r => setTimeout(r, 2000));
         }
-        console.log(`[BOT] ✅ Cleared existing commands`);
       } catch (e) {
         console.warn(`[BOT] ⚠️  Error clearing commands:`, e.message);
+        // Continue anyway
       }
-
-      await new Promise(r => setTimeout(r, 2000));
 
       let success = 0;
       let failed = 0;
+      const errors = [];
+      
       for (let i = 0; i < this.slashCommands.length; i++) {
         const cmd = this.slashCommands[i];
+        if (!cmd || !cmd.name) {
+          console.error(`[BOT] ❌ Invalid command at index ${i}:`, cmd);
+          failed++;
+          continue;
+        }
+        
         try {
-          await guild.commands.create(cmd);
+          const created = await guild.commands.create(cmd);
           success++;
           console.log(`[BOT] ✅ Created: ${cmd.name} (${i + 1}/${this.slashCommands.length})`);
-          // Increase delay slightly to avoid rate limits
+          // Delay to avoid rate limits
           await new Promise(r => setTimeout(r, 500));
         } catch (err) {
           failed++;
-          console.error(`[BOT] ❌ Failed: ${cmd.name} - ${err.message}`);
+          const errorMsg = err.message || err.toString();
+          errors.push({ name: cmd.name, error: errorMsg });
+          console.error(`[BOT] ❌ Failed: ${cmd.name} - ${errorMsg}`);
           // Continue with next command even if one fails
           await new Promise(r => setTimeout(r, 200));
         }
       }
       
       console.log(`[BOT] ✅ REGISTRATION COMPLETE: ${success}/${this.slashCommands.length} commands (${failed} failed)`);
+      if (errors.length > 0) {
+        console.log(`[BOT] ⚠️  Failed commands:`, errors.map(e => `${e.name}: ${e.error}`).join(', '));
+      }
     } catch (error) {
       console.error(`[BOT] ❌ Registration error:`, error.message);
       console.error(`[BOT] Error stack:`, error.stack);
