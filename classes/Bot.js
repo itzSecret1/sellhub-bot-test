@@ -55,6 +55,7 @@ export class Bot {
       
       console.log(`[BOT] ⚠️  Auto-command registration disabled to avoid rate limits`);
       console.log(`[BOT] 💡 To register commands, run: node register-commands.js`);
+      console.log(`[BOT] 📝 Note: Only registered commands will appear in Discord`);
       
       this.initializeAutomatedSystems();
     });
