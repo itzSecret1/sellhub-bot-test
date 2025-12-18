@@ -66,7 +66,21 @@ export default {
           console.log(`[SYNC] 📦 Raw API response type: ${Array.isArray(products) ? 'array' : typeof products}`);
           console.log(`[SYNC] 📦 Raw API response keys: ${products ? Object.keys(products).join(', ') : 'null'}`);
           
-          const pageProducts = Array.isArray(products) ? products : products?.data || [];
+          // Parse SellHub API response structure: { data: { products: [...] } }
+          let pageProducts = [];
+          if (Array.isArray(products)) {
+            pageProducts = products;
+          } else if (products?.data?.products && Array.isArray(products.data.products)) {
+            // SellHub structure: { data: { products: [...] } }
+            pageProducts = products.data.products;
+          } else if (products?.data && Array.isArray(products.data)) {
+            // Alternative structure: { data: [...] }
+            pageProducts = products.data;
+          } else if (products?.products && Array.isArray(products.products)) {
+            // Alternative structure: { products: [...] }
+            pageProducts = products.products;
+          }
+          
           console.log(`[SYNC] 📦 Parsed products count: ${pageProducts.length}`);
           
           if (pageProducts.length > 0) {
@@ -181,8 +195,22 @@ export default {
 
         while (hasMoreInvoices && invPage <= 50) {
           try {
-            const invoices = await api.get(`shops/${api.shopId}/invoices?limit=250&page=${invPage}`);
-            const pageInvoices = Array.isArray(invoices) ? invoices : invoices?.data || [];
+            const invoices = await api.get(`shops/${api.shopId}/invoices`, { limit: 250, page: invPage });
+            
+            // Parse SellHub API response structure: { data: { invoices: [...] } } or { data: [...] } or [...]
+            let pageInvoices = [];
+            if (Array.isArray(invoices)) {
+              pageInvoices = invoices;
+            } else if (invoices?.data?.invoices && Array.isArray(invoices.data.invoices)) {
+              // Structure: { data: { invoices: [...] } }
+              pageInvoices = invoices.data.invoices;
+            } else if (invoices?.data && Array.isArray(invoices.data)) {
+              // Structure: { data: [...] }
+              pageInvoices = invoices.data;
+            } else if (invoices?.invoices && Array.isArray(invoices.invoices)) {
+              // Structure: { invoices: [...] }
+              pageInvoices = invoices.invoices;
+            }
 
             if (pageInvoices.length === 0) {
               hasMoreInvoices = false;
