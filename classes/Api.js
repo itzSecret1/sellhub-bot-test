@@ -3,7 +3,7 @@ import { config } from '../utils/config.js';
 
 export class Api {
   constructor() {
-    this.baseUrl = 'https://dash.sellhub.cx/api/';
+    this.baseUrl = 'https://snakessh.sellhub.cx/api/';
     this.apiKey = config.SH_API_KEY;
     this.shopId = config.SH_SHOP_ID;
   }
@@ -11,7 +11,10 @@ export class Api {
   async get(endpoint, params = {}) {
     try {
       const response = await axios.get(`${this.baseUrl}${endpoint}`, {
-        headers: { Authorization: this.apiKey },
+        headers: { 
+          'Authorization': this.apiKey,
+          'X-API-Key': this.apiKey
+        },
         params: params,
         timeout: 15000
       });
@@ -28,7 +31,8 @@ export class Api {
     try {
       const response = await axios.post(`${this.baseUrl}${endpoint}`, data, {
         headers: {
-          Authorization: this.apiKey,
+          'Authorization': this.apiKey,
+          'X-API-Key': this.apiKey,
           'Content-Type': 'application/json'
         },
         timeout: 10000
@@ -46,7 +50,8 @@ export class Api {
     try {
       const response = await axios.put(`${this.baseUrl}${endpoint}`, data, {
         headers: {
-          Authorization: this.apiKey,
+          'Authorization': this.apiKey,
+          'X-API-Key': this.apiKey,
           'Content-Type': 'application/json'
         },
         timeout: 10000
@@ -63,7 +68,10 @@ export class Api {
   async delete(endpoint) {
     try {
       const response = await axios.delete(`${this.baseUrl}${endpoint}`, {
-        headers: { Authorization: this.apiKey },
+        headers: { 
+          'Authorization': this.apiKey,
+          'X-API-Key': this.apiKey
+        },
         timeout: 10000
       });
       return response.data;
