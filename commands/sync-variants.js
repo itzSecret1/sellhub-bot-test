@@ -37,7 +37,7 @@ export default {
 
       while (hasMoreProducts && page <= 50) {
         try {
-          const products = await api.get(`shops/${api.shopId}/products?limit=100&page=${page}`);
+          const products = await api.get(`sellhub/products?shop_id=${api.shopId}&limit=100&page=${page}`);
           const pageProducts = Array.isArray(products) ? products : products?.data || [];
 
           if (pageProducts.length === 0) {
@@ -148,7 +148,7 @@ export default {
 
         while (hasMoreInvoices && invPage <= 50) {
           try {
-            const invoices = await api.get(`shops/${api.shopId}/invoices?limit=250&page=${invPage}`);
+            const invoices = await api.get(`sellhub/invoices?shop_id=${api.shopId}&limit=250&page=${invPage}`);
             const pageInvoices = Array.isArray(invoices) ? invoices : invoices?.data || [];
 
             if (pageInvoices.length === 0) {

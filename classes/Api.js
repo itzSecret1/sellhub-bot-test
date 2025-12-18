@@ -3,7 +3,7 @@ import { config } from '../utils/config.js';
 
 export class Api {
   constructor() {
-    this.baseUrl = 'https://dash.sellhub.cx/api/sellhub/';
+    this.baseUrl = 'https://dash.sellhub.cx/api/';
     this.apiKey = config.SH_API_KEY;
     this.shopId = config.SH_SHOP_ID;
   }
