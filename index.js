@@ -7,9 +7,14 @@ import { Bot } from './classes/Bot.js';
 import { Api } from './classes/Api.js';
 import { config } from './utils/config.js';
 
-// Validate required environment variables
-const requiredVars = ['BOT_TOKEN', 'BOT_GUILD_ID', 'SH_API_KEY', 'SH_SHOP_ID'];
-const missingVars = requiredVars.filter((v) => !process.env[v]);
+// Validate required environment variables (support both SH_* and SA_* for backward compatibility)
+const hasApiKey = process.env.SH_API_KEY || process.env.SA_API_KEY;
+const hasShopId = process.env.SH_SHOP_ID || process.env.SA_SHOP_ID;
+const missingVars = [];
+if (!process.env.BOT_TOKEN) missingVars.push('BOT_TOKEN');
+if (!process.env.BOT_GUILD_ID) missingVars.push('BOT_GUILD_ID');
+if (!hasApiKey) missingVars.push('SH_API_KEY or SA_API_KEY');
+if (!hasShopId) missingVars.push('SH_SHOP_ID or SA_SHOP_ID');
 
 if (missingVars.length > 0) {
   console.error(
