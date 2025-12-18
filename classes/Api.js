@@ -86,58 +86,131 @@ export class Api {
   }
 
   async post(endpoint, data) {
-    try {
-      const response = await axios.post(`${this.baseUrl}${endpoint}`, data, {
-        headers: {
-          'Authorization': this.apiKey,
-          'X-API-Key': this.apiKey,
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000
-      });
-      return response.data;
-    } catch (error) {
-      const status = error.response?.status;
-      const respData = error.response?.data;
-      console.error(`[API POST] ${endpoint} - Status: ${status}`, respData);
-      throw { message: 'Invalid response', status, data: respData, error: error.message };
+    // Use cached prefix if available, otherwise try variations
+    const endpointVariations = this.endpointPrefix 
+      ? [`${this.endpointPrefix}${endpoint}`]
+      : [
+          endpoint,
+          `sellhub/${endpoint}`,
+          `v1/${endpoint}`,
+          `sellhub/v1/${endpoint}`
+        ];
+
+    let lastError = null;
+    for (let i = 0; i < endpointVariations.length; i++) {
+      try {
+        const url = `${this.baseUrl}${endpointVariations[i]}`;
+        const response = await axios.post(url, data, {
+          headers: {
+            'Authorization': this.apiKey,
+            'X-API-Key': this.apiKey,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000,
+          validateStatus: (status) => status < 500
+        });
+
+        if (response.status === 200 || response.status === 201) {
+          return response.data;
+        }
+        if (response.status === 404 && i < endpointVariations.length - 1) {
+          continue;
+        }
+        throw { status: response.status, data: response.data };
+      } catch (error) {
+        lastError = error;
+        if (i === endpointVariations.length - 1) {
+          const status = error.response?.status || error.status;
+          const respData = error.response?.data || error.data;
+          console.error(`[API POST] ${endpoint} - Status: ${status}`, respData);
+          throw { message: 'Invalid response', status, data: respData, error: error.message };
+        }
+      }
     }
   }
 
   async put(endpoint, data) {
-    try {
-      const response = await axios.put(`${this.baseUrl}${endpoint}`, data, {
-        headers: {
-          'Authorization': this.apiKey,
-          'X-API-Key': this.apiKey,
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000
-      });
-      return response.data;
-    } catch (error) {
-      const status = error.response?.status;
-      const respData = error.response?.data;
-      console.error(`[API PUT] ${endpoint} - Status: ${status}`, respData);
-      throw { message: 'Invalid response', status, data: respData, error: error.message };
+    const endpointVariations = this.endpointPrefix 
+      ? [`${this.endpointPrefix}${endpoint}`]
+      : [
+          endpoint,
+          `sellhub/${endpoint}`,
+          `v1/${endpoint}`,
+          `sellhub/v1/${endpoint}`
+        ];
+
+    let lastError = null;
+    for (let i = 0; i < endpointVariations.length; i++) {
+      try {
+        const url = `${this.baseUrl}${endpointVariations[i]}`;
+        const response = await axios.put(url, data, {
+          headers: {
+            'Authorization': this.apiKey,
+            'X-API-Key': this.apiKey,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000,
+          validateStatus: (status) => status < 500
+        });
+
+        if (response.status === 200 || response.status === 201) {
+          return response.data;
+        }
+        if (response.status === 404 && i < endpointVariations.length - 1) {
+          continue;
+        }
+        throw { status: response.status, data: response.data };
+      } catch (error) {
+        lastError = error;
+        if (i === endpointVariations.length - 1) {
+          const status = error.response?.status || error.status;
+          const respData = error.response?.data || error.data;
+          console.error(`[API PUT] ${endpoint} - Status: ${status}`, respData);
+          throw { message: 'Invalid response', status, data: respData, error: error.message };
+        }
+      }
     }
   }
 
   async delete(endpoint) {
-    try {
-      const response = await axios.delete(`${this.baseUrl}${endpoint}`, {
-        headers: { 
-          'Authorization': this.apiKey,
-          'X-API-Key': this.apiKey
-        },
-        timeout: 10000
-      });
-      return response.data;
-    } catch (error) {
-      const status = error.response?.status;
-      const data = error.response?.data;
-      console.error(`[API DELETE] ${endpoint} - Status: ${status}`, data);
-      throw { message: 'Invalid response', status, data, error: error.message };
+    const endpointVariations = this.endpointPrefix 
+      ? [`${this.endpointPrefix}${endpoint}`]
+      : [
+          endpoint,
+          `sellhub/${endpoint}`,
+          `v1/${endpoint}`,
+          `sellhub/v1/${endpoint}`
+        ];
+
+    let lastError = null;
+    for (let i = 0; i < endpointVariations.length; i++) {
+      try {
+        const url = `${this.baseUrl}${endpointVariations[i]}`;
+        const response = await axios.delete(url, {
+          headers: { 
+            'Authorization': this.apiKey,
+            'X-API-Key': this.apiKey
+          },
+          timeout: 10000,
+          validateStatus: (status) => status < 500
+        });
+
+        if (response.status === 200 || response.status === 201 || response.status === 204) {
+          return response.data;
+        }
+        if (response.status === 404 && i < endpointVariations.length - 1) {
+          continue;
+        }
+        throw { status: response.status, data: response.data };
+      } catch (error) {
+        lastError = error;
+        if (i === endpointVariations.length - 1) {
+          const status = error.response?.status || error.status;
+          const data = error.response?.data || error.data;
+          console.error(`[API DELETE] ${endpoint} - Status: ${status}`, data);
+          throw { message: 'Invalid response', status, data, error: error.message };
+        }
+      }
     }
   }
 
