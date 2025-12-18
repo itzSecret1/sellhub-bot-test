@@ -138,32 +138,44 @@ export class Bot {
       const guild = await this.client.guilds.fetch(config.BOT_GUILD_ID);
       
       console.log(`[BOT] 📋 Using guild.commands.create() individually...`);
+      console.log(`[BOT] Total commands to register: ${this.slashCommands.length}`);
       
       // Clear first
       try {
         const existing = await guild.commands.fetch();
+        console.log(`[BOT] Clearing ${existing.size} existing commands...`);
         for (const cmd of existing.values()) {
           await guild.commands.delete(cmd.id).catch(() => {});
         }
-      } catch (e) {}
+        console.log(`[BOT] ✅ Cleared existing commands`);
+      } catch (e) {
+        console.warn(`[BOT] ⚠️  Error clearing commands:`, e.message);
+      }
 
-      await new Promise(r => setTimeout(r, 1000));
+      await new Promise(r => setTimeout(r, 2000));
 
       let success = 0;
-      for (const cmd of this.slashCommands) {
+      let failed = 0;
+      for (let i = 0; i < this.slashCommands.length; i++) {
+        const cmd = this.slashCommands[i];
         try {
-          await guild.commands.create(cmd);
+          await guild.commands.create(cmd.data.toJSON());
           success++;
-          console.log(`[BOT] ✅ Created: ${cmd.name}`);
-          await new Promise(r => setTimeout(r, 300));
+          console.log(`[BOT] ✅ Created: ${cmd.data.name} (${i + 1}/${this.slashCommands.length})`);
+          // Increase delay slightly to avoid rate limits
+          await new Promise(r => setTimeout(r, 500));
         } catch (err) {
-          console.warn(`[BOT] ⚠️  Failed: ${cmd.name} - ${err.message}`);
+          failed++;
+          console.error(`[BOT] ❌ Failed: ${cmd.data.name} - ${err.message}`);
+          // Continue with next command even if one fails
+          await new Promise(r => setTimeout(r, 200));
         }
       }
       
-      console.log(`[BOT] ✅ REGISTRATION COMPLETE: ${success}/${this.slashCommands.length} commands`);
+      console.log(`[BOT] ✅ REGISTRATION COMPLETE: ${success}/${this.slashCommands.length} commands (${failed} failed)`);
     } catch (error) {
-      console.error(`[BOT] Registration error:`, error.message);
+      console.error(`[BOT] ❌ Registration error:`, error.message);
+      console.error(`[BOT] Error stack:`, error.stack);
     } finally {
       this.isRegisteringCommands = false;
     }
