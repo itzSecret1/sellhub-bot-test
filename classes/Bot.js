@@ -46,9 +46,16 @@ export class Bot {
       console.log(`${this.client.user.username} ready!`);
       // Wait a bit to ensure client is fully ready
       await new Promise(r => setTimeout(r, 1000));
-      if (!this.isRegisteringCommands) {
-        await this.registerSlashCommands();
-      }
+      
+      // DISABLED: Auto-registration can hit Discord rate limits
+      // Use the register-commands.js script manually when needed
+      // if (!this.isRegisteringCommands) {
+      //   await this.registerSlashCommands();
+      // }
+      
+      console.log(`[BOT] ⚠️  Auto-command registration disabled to avoid rate limits`);
+      console.log(`[BOT] 💡 To register commands, run: node register-commands.js`);
+      
       this.initializeAutomatedSystems();
     });
 
