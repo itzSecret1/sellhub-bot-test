@@ -146,22 +146,38 @@ export default {
           const variantMap = {};
 
           // Check if product has variants array
+          // In SellHub, variants can be an array of IDs (strings) or objects
           if (product.variants && Array.isArray(product.variants) && product.variants.length > 0) {
             for (const variant of product.variants) {
-              const stock = variant.stock || 0;
-              const variantId = variant.id.toString();
+              // Handle both cases: variant as ID string or variant as object
+              let variantId, variantName, variantStock;
+              
+              if (typeof variant === 'string') {
+                // Variant is just an ID string - we'll get details from invoices or skip
+                variantId = variant;
+                variantName = `Variant ${variantId}`;
+                variantStock = 0;
+              } else if (variant && variant.id) {
+                // Variant is an object
+                variantId = variant.id.toString();
+                variantName = variant.name || `Variant ${variant.id}`;
+                variantStock = variant.stock || 0;
+              } else {
+                // Skip invalid variant
+                continue;
+              }
 
               if (!processedVariantIds.has(variantId)) {
                 variantMap[variantId] = {
-                  id: variant.id,
-                  name: variant.name || `Variant ${variant.id}`,
-                  stock: stock
+                  id: variantId,
+                  name: variantName,
+                  stock: variantStock
                 };
 
                 variantsList.push({
                   productName: product.name,
-                  variantName: variant.name || `Variant ${variant.id}`,
-                  stock: stock
+                  variantName: variantName,
+                  stock: variantStock
                 });
 
                 processedVariantIds.add(variantId);
@@ -169,6 +185,7 @@ export default {
               }
             }
 
+            // Only save products that have at least one valid variant
             if (Object.keys(variantMap).length > 0) {
               allVariants[product.id.toString()] = {
                 productId: product.id,

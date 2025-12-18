@@ -64,12 +64,20 @@ export default {
           const variantsData = loadVariantsData();
           const searchTerm = (focusedOption.value || '').toLowerCase().trim();
           
-          // Get all products and filter
+          // Get all products that have variants (only show products with variants)
           const products = Object.values(variantsData)
-            .filter((p) => p && p.productName && p.productId)
+            .filter((p) => {
+              // Only include products that have variants with at least one variant
+              return p && 
+                     p.productName && 
+                     p.productId && 
+                     p.variants && 
+                     Object.keys(p.variants).length > 0;
+            })
             .map((p) => ({
               name: p.productName.slice(0, 100), // Discord limit
-              id: String(p.productId)
+              id: String(p.productId),
+              variantCount: Object.keys(p.variants || {}).length
             }))
             .filter((p) => 
               searchTerm === '' || 
@@ -84,7 +92,7 @@ export default {
             value: p.id
           }));
 
-          console.log(`[REPLACE] Product autocomplete: Found ${response.length} products for "${searchTerm}"`);
+          console.log(`[REPLACE] Product autocomplete: Found ${response.length} products with variants for "${searchTerm}"`);
           await interaction.respond(response);
         } catch (err) {
           console.error(`[REPLACE] Product autocomplete error: ${err.message}`);
@@ -106,21 +114,28 @@ export default {
           const variantsData = loadVariantsData();
           const productData = variantsData[productInput];
 
-          if (!productData || !productData.variants) {
+          if (!productData || !productData.variants || Object.keys(productData.variants).length === 0) {
             console.log(`[REPLACE] No variants found for product ${productInput}`);
             await interaction.respond([]);
             return;
           }
 
+          // Only show variants that have valid data
           const variants = Object.values(productData.variants)
-            .filter((v) => v && v.id && v.name)
+            .filter((v) => v && v.id && v.name) // Only variants with valid data
             .map((v) => ({
-              name: `${v.name.slice(0, 80)} (${v.stock})`.slice(0, 100),
+              name: `${v.name.slice(0, 80)} (Stock: ${v.stock || 0})`.slice(0, 100),
               value: String(v.id)
             }))
             .slice(0, 25);
 
-          console.log(`[REPLACE] Variant autocomplete: Found ${variants.length} variants`);
+          if (variants.length === 0) {
+            console.log(`[REPLACE] No valid variants found for product ${productInput}`);
+            await interaction.respond([]);
+            return;
+          }
+
+          console.log(`[REPLACE] Variant autocomplete: Found ${variants.length} variants for product ${productInput}`);
           await interaction.respond(variants);
         } catch (err) {
           console.error(`[REPLACE] Variant autocomplete error: ${err.message}`);
