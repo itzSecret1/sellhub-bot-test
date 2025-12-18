@@ -159,8 +159,42 @@ export class Bot {
       }
 
       console.log(`[BOT] ✅ Loaded ${this.slashCommands.length} commands into memory`);
-      // Wait a bit more to ensure client.user is available
-      await new Promise(r => setTimeout(r, 2000));
+      
+      // Use REST API for faster registration (if not rate limited)
+      if (!this.client.user || !this.client.user.id) {
+        await new Promise(r => setTimeout(r, 2000));
+      }
+      
+      // Try REST API first (faster, but can hit rate limits)
+      try {
+        const rest = new REST({ version: '10' }).setToken(config.BOT_TOKEN);
+        const clientId = this.client.user.id;
+        const guildId = config.BOT_GUILD_ID;
+        
+        console.log(`[BOT] 🚀 Attempting REST API registration...`);
+        const data = await Promise.race([
+          rest.put(
+            Routes.applicationGuildCommands(clientId, guildId),
+            { body: this.slashCommands }
+          ),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('REST API timeout (15s)')), 15000)
+          )
+        ]);
+        
+        console.log(`[BOT] ✅ Successfully registered ${data.length} commands via REST API!`);
+        this.isRegisteringCommands = false;
+        return;
+      } catch (error) {
+        if (error.code === 30034) {
+          console.error(`[BOT] ❌ RATE LIMIT: Cannot register commands right now`);
+          throw error; // Re-throw to show in main error handler
+        }
+        console.log(`[BOT] ⚠️  REST API failed: ${error.message}`);
+        console.log(`[BOT] 🔄 Falling back to individual registration...`);
+      }
+      
+      // Fallback to individual registration
       await this.registerIndividualCommands();
       
     } catch (error) {
