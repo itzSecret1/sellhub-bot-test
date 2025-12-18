@@ -10,7 +10,11 @@ export class Api {
 
   async get(endpoint, params = {}) {
     try {
-      const response = await axios.get(`${this.baseUrl}${endpoint}`, {
+      const url = `${this.baseUrl}${endpoint}`;
+      console.log(`[API GET] Requesting: ${url}`);
+      console.log(`[API GET] API Key (first 20 chars): ${this.apiKey?.substring(0, 20)}...`);
+      
+      const response = await axios.get(url, {
         headers: { 
           'Authorization': this.apiKey,
           'X-API-Key': this.apiKey
@@ -23,6 +27,7 @@ export class Api {
       const status = error.response?.status;
       const data = error.response?.data;
       console.error(`[API GET] ${endpoint} - Status: ${status}`, data);
+      console.error(`[API GET] Full URL: ${this.baseUrl}${endpoint}`);
       throw { message: 'Invalid response', status, data, error: error.message };
     }
   }
