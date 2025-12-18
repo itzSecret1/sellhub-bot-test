@@ -50,10 +50,12 @@ export class Bot {
     this.client.on('ready', async () => {
       console.log(`${this.client.user.username} ready!`);
       
-      // CRITICAL: Load commands FIRST before anything else
-      console.log(`[BOT] 🔄 Loading commands into memory...`);
-      await this.registerSlashCommands();
-      console.log(`[BOT] ✅ Commands loaded: ${this.slashCommandsMap.size} commands in map`);
+      // Ensure commands are loaded
+      if (this.slashCommandsMap.size === 0) {
+        console.log(`[BOT] ⚠️  Commands not loaded, loading now...`);
+        await this.loadCommandsSync();
+      }
+      console.log(`[BOT] ✅ Commands in memory: ${this.slashCommandsMap.size}`);
       console.log(`[BOT] 📝 Command names: ${Array.from(this.slashCommandsMap.keys()).join(', ')}`);
       
       // Wait a bit to ensure client is fully ready
