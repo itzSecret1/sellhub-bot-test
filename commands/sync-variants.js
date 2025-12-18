@@ -37,8 +37,7 @@ export default {
 
       while (hasMoreProducts && page <= 50) {
         try {
-          // Try different endpoint structures for SellHub
-          // Try: shops/{shopId}/products (original SellAuth structure)
+          // Fetch products from SellHub API
           const products = await api.get(`shops/${api.shopId}/products?limit=100&page=${page}`);
           const pageProducts = Array.isArray(products) ? products : products?.data || [];
 
