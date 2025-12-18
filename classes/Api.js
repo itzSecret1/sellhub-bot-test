@@ -19,7 +19,10 @@ export class Api {
       `sellhub/v1/${endpoint}` // With both prefixes
     ];
 
-    for (const endpointVar of endpointVariations) {
+    let lastError = null;
+    
+    for (let i = 0; i < endpointVariations.length; i++) {
+      const endpointVar = endpointVariations[i];
       try {
         const url = `${this.baseUrl}${endpointVar}`;
         console.log(`[API GET] Trying: ${url}`);
@@ -47,6 +50,7 @@ export class Api {
 
         // If 404, try next variation
         if (response.status === 404) {
+          lastError = { status: 404, data: response.data, message: 'Not found' };
           continue;
         }
 
@@ -58,17 +62,21 @@ export class Api {
           error: `HTTP ${response.status}` 
         };
       } catch (error) {
+        lastError = {
+          status: error.response?.status || error.status,
+          data: error.response?.data || error.data,
+          message: error.message || error.error
+        };
+        
         // If it's the last variation, throw the error
-        if (endpointVar === endpointVariations[endpointVariations.length - 1]) {
-          const status = error.response?.status || error.status;
-          const data = error.response?.data || error.data;
+        if (i === endpointVariations.length - 1) {
           console.error(`[API GET] All variations failed for: ${endpoint}`);
-          console.error(`[API GET] Last error - Status: ${status}`, data);
+          console.error(`[API GET] Last error - Status: ${lastError.status}`, lastError.data);
           throw { 
             message: 'Invalid response', 
-            status, 
-            data, 
-            error: error.message || error.error 
+            status: lastError.status, 
+            data: lastError.data, 
+            error: lastError.message 
           };
         }
         // Otherwise, continue to next variation
