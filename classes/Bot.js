@@ -55,21 +55,22 @@ export class Bot {
         
         console.log(`[BOT] 📊 Currently registered: ${registered.size} commands`);
         
-        if (registered.size < 5) {
+        if (registered.size < expectedCount * 0.8) {
           console.log(`[BOT] ⚠️  Only ${registered.size} commands registered (expected ~${expectedCount})`);
-          console.log(`[BOT] ❌ AUTO-REGISTRATION DISABLED: Discord is blocking this bot token`);
-          console.log(`[BOT] `);
-          console.log(`[BOT] 🔴 SOLUCIÓN REQUERIDA: Crear nuevo bot token`);
-          console.log(`[BOT] `);
-          console.log(`[BOT] 📋 PASOS:`);
-          console.log(`[BOT]    1. Ve a: https://discord.com/developers/applications`);
-          console.log(`[BOT]    2. Selecciona tu aplicación o crea una nueva`);
-          console.log(`[BOT]    3. Ve a "Bot" → Click "Reset Token" o crea nuevo bot`);
-          console.log(`[BOT]    4. Copia el NUEVO token`);
-          console.log(`[BOT]    5. En Railway: Settings → Variables → Actualiza BOT_TOKEN`);
-          console.log(`[BOT]    6. Reinicia el bot (se registrarán automáticamente)`);
-          console.log(`[BOT] `);
-          console.log(`[BOT] ⚠️  El bot funcionará pero los comandos no aparecerán hasta crear nuevo token`);
+          console.log(`[BOT] 🔄 Attempting to register missing commands...`);
+          
+          // Try to register commands automatically
+          try {
+            await this.registerSlashCommands();
+          } catch (e) {
+            if (e.code === 30034) {
+              console.log(`[BOT] ❌ RATE LIMIT: Discord is blocking registration`);
+              console.log(`[BOT] 💡 Wait 24-48 hours or create a new bot token`);
+            } else {
+              console.log(`[BOT] ⚠️  Registration failed: ${e.message}`);
+              console.log(`[BOT] 💡 Run: node register-commands.js manually`);
+            }
+          }
         } else {
           console.log(`[BOT] ✅ Commands registered: ${registered.size}`);
         }
