@@ -148,7 +148,7 @@ export class Api {
         const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Unknown error';
         const errorData = error.response?.data || error.data;
         
-        console.error(`[API GET] ❌ Error [${i + 1}/${endpointVariations.length}]: Status ${errorStatus}, Message: ${errorMessage}`);
+        console.error(`[API GET] ❌ Error [${attemptCount}/${maxAttempts}]: Status ${errorStatus}, Message: ${errorMessage}`);
         if (errorData && typeof errorData === 'object') {
           console.error(`[API GET] Error details:`, JSON.stringify(errorData, null, 2).substring(0, 300));
         }
@@ -159,11 +159,12 @@ export class Api {
           message: errorMessage
         };
         
-        // Continue to next variation
+        // Continue to next variation (will continue inner loop, then outer loop)
         console.log(`[API GET] ⏭️  Trying next variation...`);
         continue;
       }
-    }
+      } // End inner loop (endpointVariations)
+    } // End outer loop (baseUrls)
     
     // If we get here, all attempts failed
     console.error(`[API GET] ❌ All ${maxAttempts} attempts failed for: ${endpoint}`);
