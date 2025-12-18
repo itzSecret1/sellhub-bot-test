@@ -11,28 +11,36 @@ export class Api {
   }
 
   async get(endpoint, params = {}) {
+    // Based on SellHub docs: https://dash.sellhub.cx/api/sellhub/...
     // Try multiple endpoint structures and base URLs
-    // First, try different base URLs
+    // First, try different base URLs (prioritize dash.sellhub.cx based on docs)
     const baseUrls = [
+      'https://dash.sellhub.cx/api/', // From official docs
+      'https://dash.sellhub.cx/api/sellhub/', // With sellhub prefix in base
       'https://snakessh.sellhub.cx/api/',
-      'https://dash.sellhub.cx/api/',
       'https://api.sellhub.cx/',
+      'https://api.sellhub.cx/v1/',
       'https://snakessh.sellhub.cx/'
     ];
     
-    // Then try different endpoint structures
+    // Extract resource type from endpoint (products, invoices, etc.)
+    const resourceType = endpoint.includes('products') ? 'products' : 
+                        endpoint.includes('invoices') ? 'invoices' :
+                        endpoint.includes('deliverables') ? 'deliverables' : '';
+    
+    // Then try different endpoint structures (prioritize sellhub/ prefix based on docs)
     const endpointVariations = [
+      `sellhub/shops/${this.shopId}/${resourceType}`, // From docs: sellhub/shops/{shopId}/products
+      `sellhub/${resourceType}`, // sellhub/products
+      `sellhub/${endpoint}`, // sellhub/shops/{shopId}/products
       endpoint, // Original: shops/{shopId}/products
-      endpoint.replace(`shops/${this.shopId}/`, ''), // Remove shops/{shopId}/: products
-      `products`, // Just products (if endpoint contains products)
-      `invoices`, // Just invoices (if endpoint contains invoices)
-      `${this.shopId}/${endpoint.replace(`shops/${this.shopId}/`, '')}`, // shopId/products
-      `shops/${this.shopId}/${endpoint.replace(`shops/${this.shopId}/`, '')}`, // shops/shopId/products (redundant but try)
-      `sellhub/${endpoint}`, // With sellhub prefix
-      `v1/${endpoint}`, // With v1 prefix
-      `sellhub/v1/${endpoint}`, // With both prefixes
-      `api/${endpoint}`, // With api prefix
-      `api/v1/${endpoint}` // With api/v1 prefix
+      `shops/${this.shopId}/${resourceType}`, // shops/{shopId}/products
+      `${this.shopId}/${resourceType}`, // shopId/products
+      resourceType, // Just products
+      `v1/shops/${this.shopId}/${resourceType}`, // v1/shops/{shopId}/products
+      `v1/${resourceType}`, // v1/products
+      `api/sellhub/shops/${this.shopId}/${resourceType}`, // api/sellhub/shops/{shopId}/products
+      `api/v1/shops/${this.shopId}/${resourceType}` // api/v1/shops/{shopId}/products
     ];
 
     let lastError = null;
@@ -46,8 +54,9 @@ export class Api {
         attemptCount++;
         
         // Skip if endpoint doesn't make sense for this variation
-        if (endpoint.includes('products') && endpointVar === 'invoices') continue;
-        if (endpoint.includes('invoices') && endpointVar === 'products') continue;
+        if (endpoint.includes('products') && endpointVar.includes('invoices')) continue;
+        if (endpoint.includes('invoices') && endpointVar.includes('products')) continue;
+        if (endpoint.includes('deliverables') && !endpointVar.includes('deliverables') && resourceType === 'deliverables') continue;
         
         try {
           const url = `${baseUrl}${endpointVar}`;
@@ -60,11 +69,12 @@ export class Api {
           
           const response = await axios.get(url, {
             headers: { 
-              'Authorization': this.apiKey,
+              'Authorization': this.apiKey, // According to docs: without Bearer prefix
               'X-API-Key': this.apiKey,
-              'Accept': 'application/json'
+              'Accept': 'application/json',
+              'Content-Type': 'application/json'
             },
-            params: params,
+        params: params,
             timeout: 15000,
             validateStatus: (status) => status < 500 // Don't throw on 4xx, we'll handle it
           });
@@ -117,7 +127,7 @@ export class Api {
             console.log(`[API GET] Sample data:`, JSON.stringify(response.data, null, 2).substring(0, 500));
           }
           
-          return response.data;
+      return response.data;
         }
 
         // If 404, try next variation
@@ -143,7 +153,7 @@ export class Api {
           data: response.data, 
           error: `HTTP ${response.status}` 
         };
-      } catch (error) {
+    } catch (error) {
         const errorStatus = error.response?.status || error.status || 'N/A';
         const errorMessage = error.response?.data?.error || error.response?.data?.message || error.message || 'Unknown error';
         const errorData = error.response?.data || error.data;
@@ -199,29 +209,29 @@ export class Api {
       try {
         const url = `${this.baseUrl}${endpointVariations[i]}`;
         const response = await axios.post(url, data, {
-          headers: {
+        headers: {
             'Authorization': this.apiKey,
             'X-API-Key': this.apiKey,
-            'Content-Type': 'application/json'
-          },
+          'Content-Type': 'application/json'
+        },
           timeout: 10000,
           validateStatus: (status) => status < 500
-        });
+      });
 
         if (response.status === 200 || response.status === 201) {
-          return response.data;
+      return response.data;
         }
         if (response.status === 404 && i < endpointVariations.length - 1) {
           continue;
         }
         throw { status: response.status, data: response.data };
-      } catch (error) {
+    } catch (error) {
         lastError = error;
         if (i === endpointVariations.length - 1) {
           const status = error.response?.status || error.status;
           const respData = error.response?.data || error.data;
-          console.error(`[API POST] ${endpoint} - Status: ${status}`, respData);
-          throw { message: 'Invalid response', status, data: respData, error: error.message };
+      console.error(`[API POST] ${endpoint} - Status: ${status}`, respData);
+      throw { message: 'Invalid response', status, data: respData, error: error.message };
         }
       }
     }
@@ -242,29 +252,29 @@ export class Api {
       try {
         const url = `${this.baseUrl}${endpointVariations[i]}`;
         const response = await axios.put(url, data, {
-          headers: {
+        headers: {
             'Authorization': this.apiKey,
             'X-API-Key': this.apiKey,
-            'Content-Type': 'application/json'
-          },
+          'Content-Type': 'application/json'
+        },
           timeout: 10000,
           validateStatus: (status) => status < 500
-        });
+      });
 
         if (response.status === 200 || response.status === 201) {
-          return response.data;
+      return response.data;
         }
         if (response.status === 404 && i < endpointVariations.length - 1) {
           continue;
         }
         throw { status: response.status, data: response.data };
-      } catch (error) {
+    } catch (error) {
         lastError = error;
         if (i === endpointVariations.length - 1) {
           const status = error.response?.status || error.status;
           const respData = error.response?.data || error.data;
-          console.error(`[API PUT] ${endpoint} - Status: ${status}`, respData);
-          throw { message: 'Invalid response', status, data: respData, error: error.message };
+      console.error(`[API PUT] ${endpoint} - Status: ${status}`, respData);
+      throw { message: 'Invalid response', status, data: respData, error: error.message };
         }
       }
     }
@@ -294,19 +304,19 @@ export class Api {
         });
 
         if (response.status === 200 || response.status === 201 || response.status === 204) {
-          return response.data;
+      return response.data;
         }
         if (response.status === 404 && i < endpointVariations.length - 1) {
           continue;
         }
         throw { status: response.status, data: response.data };
-      } catch (error) {
+    } catch (error) {
         lastError = error;
         if (i === endpointVariations.length - 1) {
           const status = error.response?.status || error.status;
           const data = error.response?.data || error.data;
-          console.error(`[API DELETE] ${endpoint} - Status: ${status}`, data);
-          throw { message: 'Invalid response', status, data, error: error.message };
+      console.error(`[API DELETE] ${endpoint} - Status: ${status}`, data);
+      throw { message: 'Invalid response', status, data, error: error.message };
         }
       }
     }
