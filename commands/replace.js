@@ -234,9 +234,9 @@ export default {
         return;
       }
 
-      // Validate productId exists
-      if (!productData.productId || typeof productData.productId !== 'number') {
-        console.error('[REPLACE] Invalid productId in cache:', productData.productId);
+      // Validate productId exists (can be number or string in SellHub)
+      if (!productData.productId || (typeof productData.productId !== 'number' && typeof productData.productId !== 'string')) {
+        console.error('[REPLACE] Invalid productId in cache:', productData.productId, typeof productData.productId);
         await interaction.editReply({
           content: `❌ Estructura de caché corrupta. Ejecuta /sync-variants`
         });
@@ -260,9 +260,9 @@ export default {
         return;
       }
 
-      // Validate variant structure
-      if (!variantData.id || typeof variantData.id !== 'number') {
-        console.error('[REPLACE] Invalid variantId in cache:', variantData.id);
+      // Validate variant structure (id can be number or string in SellHub)
+      if (!variantData.id || (typeof variantData.id !== 'number' && typeof variantData.id !== 'string')) {
+        console.error('[REPLACE] Invalid variantId in cache:', variantData.id, typeof variantData.id);
         await interaction.editReply({
           content: `❌ Estructura de caché corrupta. Ejecuta /sync-variants`
         });
