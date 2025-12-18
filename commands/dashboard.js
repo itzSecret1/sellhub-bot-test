@@ -7,7 +7,21 @@ export default {
     .setDescription('📊 Advanced server dashboard with analytics and AI insights'),
 
   async execute(interaction, api) {
-    await interaction.deferReply();
+    // CRITICAL: Defer reply IMMEDIATELY to prevent timeout
+    try {
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply();
+        console.log(`[DASHBOARD] ✅ Deferred reply immediately`);
+      }
+    } catch (deferError) {
+      console.error(`[DASHBOARD] ❌ Failed to defer reply: ${deferError.message}`);
+      try {
+        await interaction.reply({ content: '⏳ Cargando dashboard...', ephemeral: true });
+      } catch (replyError) {
+        console.error(`[DASHBOARD] ❌ Also failed to reply: ${replyError.message}`);
+        return;
+      }
+    }
 
     try {
       const guild = interaction.guild;
