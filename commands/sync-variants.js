@@ -217,50 +217,97 @@ export default {
       }
 
       // STEP 2.5: Fetch real stock from deliverables for all variants
-      console.log(`[SYNC] === STEP 2.5: Fetching real stock from deliverables ===`);
-      console.log(`[SYNC] 📦 Fetching stock for ${variantsToFetchStock.length} variants...`);
+      // NOTE: This step is optional - if deliverables endpoint doesn't work, we'll skip it
+      // and keep stock at 0 (which will be updated when items are actually used)
+      console.log(`[SYNC] === STEP 2.5: Fetching real stock from deliverables (optional) ===`);
+      console.log(`[SYNC] 📦 Attempting to fetch stock for ${variantsToFetchStock.length} variants...`);
+      console.log(`[SYNC] ⚠️  Note: If endpoints fail, stock will remain at 0 (will be updated on use)`);
       
       let stockFetched = 0;
-      for (const variantInfo of variantsToFetchStock) {
+      let stockErrors = 0;
+      
+      for (let i = 0; i < variantsToFetchStock.length; i++) {
+        const variantInfo = variantsToFetchStock[i];
+        
         try {
-          // Small delay to respect rate limits
-          if (stockFetched > 0 && stockFetched % 10 === 0) {
-            await new Promise(resolve => setTimeout(resolve, 2000)); // 2s delay every 10 requests
+          // CRITICAL: Wait at least 5 seconds between each request to avoid Cloudflare rate limits
+          if (i > 0) {
+            await new Promise(resolve => setTimeout(resolve, 5000)); // 5 seconds between requests
           }
           
-          const deliverablesData = await api.get(
-            `shops/${api.shopId}/products/${variantInfo.productId}/deliverables/${variantInfo.variantId}`
-          );
+          // Try to fetch stock with retry logic for 429 errors
+          let retries = 0;
+          let deliverablesData = null;
+          const maxRetries = 2;
           
-          const items = parseDeliverables(deliverablesData);
-          const realStock = items.length;
-          
-          // Update stock in allVariants
-          const productIdStr = variantInfo.productId.toString();
-          if (allVariants[productIdStr] && allVariants[productIdStr].variants[variantInfo.variantId]) {
-            allVariants[productIdStr].variants[variantInfo.variantId].stock = realStock;
-            
-            // Update variantsList for display
-            const variantInList = variantsList.find(v => 
-              v.productName === variantInfo.productName && 
-              v.variantName === variantInfo.variantName
-            );
-            if (variantInList) {
-              variantInList.stock = realStock;
+          while (retries <= maxRetries) {
+            try {
+              deliverablesData = await api.get(
+                `shops/${api.shopId}/products/${variantInfo.productId}/deliverables/${variantInfo.variantId}`
+              );
+              break; // Success, exit retry loop
+            } catch (error) {
+              // If 429 (rate limit), wait longer and retry
+              if (error.status === 429 || (error.response && error.response.status === 429)) {
+                retries++;
+                if (retries <= maxRetries) {
+                  const waitTime = 10000 * retries; // 10s, 20s
+                  console.log(`[SYNC] ⚠️  Rate limited (429), waiting ${waitTime/1000}s before retry ${retries}/${maxRetries}...`);
+                  await new Promise(resolve => setTimeout(resolve, waitTime));
+                  continue;
+                }
+              }
+              // If 404 or other error, don't retry
+              throw error;
             }
           }
           
-          stockFetched++;
-          if (stockFetched % 50 === 0) {
-            console.log(`[SYNC] 📦 Fetched stock for ${stockFetched}/${variantsToFetchStock.length} variants...`);
+          if (deliverablesData) {
+            const items = parseDeliverables(deliverablesData);
+            const realStock = items.length;
+            
+            // Update stock in allVariants
+            const productIdStr = variantInfo.productId.toString();
+            if (allVariants[productIdStr] && allVariants[productIdStr].variants[variantInfo.variantId]) {
+              allVariants[productIdStr].variants[variantInfo.variantId].stock = realStock;
+              
+              // Update variantsList for display
+              const variantInList = variantsList.find(v => 
+                v.productName === variantInfo.productName && 
+                v.variantName === variantInfo.variantName
+              );
+              if (variantInList) {
+                variantInList.stock = realStock;
+              }
+            }
+            
+            stockFetched++;
+            console.log(`[SYNC] ✅ Stock for ${variantInfo.productName}/${variantInfo.variantName}: ${realStock}`);
           }
         } catch (e) {
-          console.error(`[SYNC] Error fetching stock for ${variantInfo.productId}/${variantInfo.variantId}:`, e.message);
-          // Continue with next variant
+          stockErrors++;
+          // Log error but don't spam - only log every 5th error
+          if (stockErrors % 5 === 1 || stockErrors <= 3) {
+            console.error(`[SYNC] ⚠️  Could not fetch stock for ${variantInfo.productId}/${variantInfo.variantId}: ${e.message || 'Endpoint may not exist'}`);
+          }
+          // Continue with next variant - stock will remain at 0
+        }
+        
+        // Progress update every 5 variants
+        if ((i + 1) % 5 === 0) {
+          console.log(`[SYNC] 📦 Progress: ${i + 1}/${variantsToFetchStock.length} variants processed (${stockFetched} successful, ${stockErrors} errors)`);
         }
       }
       
-      console.log(`[SYNC] ✅ Fetched real stock for ${stockFetched} variants`);
+      if (stockFetched > 0) {
+        console.log(`[SYNC] ✅ Successfully fetched stock for ${stockFetched}/${variantsToFetchStock.length} variants`);
+      } else {
+        console.log(`[SYNC] ⚠️  Could not fetch stock for any variants (endpoint may not be available). Stock will be updated when items are used.`);
+      }
+      
+      if (stockErrors > 0) {
+        console.log(`[SYNC] ⚠️  ${stockErrors} variants had errors fetching stock (this is normal if deliverables endpoint is not available)`);
+      }
 
       // STEP 3: Discover missing variants from invoices (with pagination)
       console.log(`[SYNC] === STEP 3: Discovering variants from invoices ===`);
