@@ -426,8 +426,14 @@ export class Bot {
       }
 
       if (!interaction.isChatInputCommand()) return;
+      
       const command = this.slashCommandsMap.get(interaction.commandName);
-      if (!command) return;
+      if (!command) {
+        console.log(`[BOT] ⚠️  Command not found: ${interaction.commandName}`);
+        return;
+      }
+      
+      console.log(`[BOT] 📥 Command received: /${interaction.commandName} from ${interaction.user.username} (${interaction.user.id})`);
 
       if (!this.cooldowns.has(interaction.commandName)) {
         this.cooldowns.set(interaction.commandName, new Collection());
@@ -453,12 +459,19 @@ export class Bot {
       setTimeout(() => timestamps.delete(interaction.user.id), cooldownAmount);
 
       try {
+        console.log(`[BOT] 🔍 Checking permissions for /${interaction.commandName}...`);
         if (await checkUserIdWhitelist(command, interaction, config)) {
+          console.log(`[BOT] ✅ Permissions OK, executing /${interaction.commandName}...`);
+          const startTime = Date.now();
           await command.execute(interaction, this.api);
+          const duration = Date.now() - startTime;
+          console.log(`[BOT] ✅ Command /${interaction.commandName} completed in ${duration}ms`);
         } else {
+          console.log(`[BOT] ❌ Permission denied for /${interaction.commandName}`);
           throw new NotWhitelistedException();
         }
       } catch (error) {
+        console.error(`[BOT] ❌ Error in command /${interaction.commandName}:`, error.message);
         console.error(`[BOT] Command error (${interaction.commandName}):`, error);
         console.error(`[BOT] Error stack:`, error.stack?.split('\n').slice(0, 5).join('\n'));
         
