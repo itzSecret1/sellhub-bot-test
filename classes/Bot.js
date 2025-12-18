@@ -164,12 +164,18 @@ export class Bot {
   }
 
   async registerSlashCommands() {
-    if (this.isRegisteringCommands) return;
+    // This method loads commands into memory AND optionally registers them
+    if (this.isRegisteringCommands) {
+      console.log(`[BOT] ⚠️  Already registering commands, skipping...`);
+      return;
+    }
     this.isRegisteringCommands = true;
 
     try {
+      // Clear existing maps
       this.slashCommands = [];
       this.slashCommandsMap.clear();
+      console.log(`[BOT] 🔄 Loading commands from filesystem...`);
 
       const commandFiles = readdirSync(join(__dirname, '..', 'commands'))
         .filter((file) => file.endsWith('.js') && !file.endsWith('.map'));
