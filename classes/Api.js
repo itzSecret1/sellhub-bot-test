@@ -11,16 +11,19 @@ export class Api {
   }
 
   async get(endpoint, params = {}) {
-    // Based on SellHub docs: https://dash.sellhub.cx/api/sellhub/...
+    // Based on SellHub docs and dashboard URL structure
+    // Dashboard: https://dash.sellhub.cx/{shopId}/products/...
     // Try multiple endpoint structures and base URLs
     // First, try different base URLs (prioritize dash.sellhub.cx based on docs)
     const baseUrls = [
-      'https://dash.sellhub.cx/api/', // From official docs
-      'https://dash.sellhub.cx/api/sellhub/', // With sellhub prefix in base
-      'https://snakessh.sellhub.cx/api/',
-      'https://api.sellhub.cx/',
-      'https://api.sellhub.cx/v1/',
-      'https://snakessh.sellhub.cx/'
+      `https://snakessh.sellhub.cx/api/${this.shopId}/`, // Shop-specific API (most likely)
+      `https://dash.sellhub.cx/api/${this.shopId}/`, // Shop-specific API on dash
+      `https://dash.sellhub.cx/api/sellhub/`, // From official docs
+      `https://dash.sellhub.cx/api/`, // From official docs
+      `https://snakessh.sellhub.cx/api/`,
+      `https://api.sellhub.cx/`,
+      `https://api.sellhub.cx/v1/`,
+      `https://snakessh.sellhub.cx/`
     ];
     
     // Extract resource type from endpoint (products, invoices, etc.)
@@ -28,17 +31,17 @@ export class Api {
                         endpoint.includes('invoices') ? 'invoices' :
                         endpoint.includes('deliverables') ? 'deliverables' : '';
     
-    // Then try different endpoint structures (prioritize sellhub/ prefix based on docs)
+    // Then try different endpoint structures (prioritize simple resource names)
     const endpointVariations = [
+      resourceType, // Just products (if shop ID is in base URL)
+      `shops/${this.shopId}/${resourceType}`, // shops/{shopId}/products
       `sellhub/shops/${this.shopId}/${resourceType}`, // From docs: sellhub/shops/{shopId}/products
       `sellhub/${resourceType}`, // sellhub/products
-      `sellhub/${endpoint}`, // sellhub/shops/{shopId}/products
       endpoint, // Original: shops/{shopId}/products
-      `shops/${this.shopId}/${resourceType}`, // shops/{shopId}/products
+      `sellhub/${endpoint}`, // sellhub/shops/{shopId}/products
       `${this.shopId}/${resourceType}`, // shopId/products
-      resourceType, // Just products
-      `v1/shops/${this.shopId}/${resourceType}`, // v1/shops/{shopId}/products
       `v1/${resourceType}`, // v1/products
+      `v1/shops/${this.shopId}/${resourceType}`, // v1/shops/{shopId}/products
       `api/sellhub/shops/${this.shopId}/${resourceType}`, // api/sellhub/shops/{shopId}/products
       `api/v1/shops/${this.shopId}/${resourceType}` // api/v1/shops/{shopId}/products
     ];
