@@ -1,9 +1,10 @@
 import { SlashCommandBuilder, EmbedBuilder } from 'discord.js';
-import { writeFileSync } from 'fs';
+import { writeFileSync, existsSync, unlinkSync } from 'fs';
 import { join } from 'path';
 import { AdvancedCommandLogger } from '../utils/advancedCommandLogger.js';
 import { ErrorLog } from '../utils/errorLogger.js';
 import { parseDeliverables } from '../utils/parseDeliverables.js';
+import { loadVariantsData } from '../utils/dataLoader.js';
 
 const variantsDataPath = join(process.cwd(), 'variantsData.json');
 
