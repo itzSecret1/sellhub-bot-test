@@ -3,33 +3,77 @@ import { config } from '../utils/config.js';
 
 export class Api {
   constructor() {
-    // Try different base URLs - SellHub might use different structure
-    this.baseUrl = 'https://snakessh.sellhub.cx/api/v1/';
+    // Base URL - try without /v1/ first, then fallback
+    this.baseUrl = 'https://snakessh.sellhub.cx/api/';
     this.apiKey = config.SH_API_KEY;
     this.shopId = config.SH_SHOP_ID;
+    this.endpointPrefix = ''; // Will be determined dynamically
   }
 
   async get(endpoint, params = {}) {
-    try {
-      const url = `${this.baseUrl}${endpoint}`;
-      console.log(`[API GET] Requesting: ${url}`);
-      console.log(`[API GET] API Key (first 20 chars): ${this.apiKey?.substring(0, 20)}...`);
-      
-      const response = await axios.get(url, {
-        headers: { 
-          'Authorization': this.apiKey,
-          'X-API-Key': this.apiKey
-        },
-        params: params,
-        timeout: 15000
-      });
-      return response.data;
-    } catch (error) {
-      const status = error.response?.status;
-      const data = error.response?.data;
-      console.error(`[API GET] ${endpoint} - Status: ${status}`, data);
-      console.error(`[API GET] Full URL: ${this.baseUrl}${endpoint}`);
-      throw { message: 'Invalid response', status, data, error: error.message };
+    // Try multiple endpoint structures
+    const endpointVariations = [
+      endpoint, // Original
+      `sellhub/${endpoint}`, // With sellhub prefix
+      `v1/${endpoint}`, // With v1 prefix
+      `sellhub/v1/${endpoint}` // With both prefixes
+    ];
+
+    for (const endpointVar of endpointVariations) {
+      try {
+        const url = `${this.baseUrl}${endpointVar}`;
+        console.log(`[API GET] Trying: ${url}`);
+        
+        const response = await axios.get(url, {
+          headers: { 
+            'Authorization': this.apiKey,
+            'X-API-Key': this.apiKey
+          },
+          params: params,
+          timeout: 15000,
+          validateStatus: (status) => status < 500 // Don't throw on 4xx, we'll handle it
+        });
+
+        // If we get a successful response, cache this endpoint structure
+        if (response.status === 200 || response.status === 201) {
+          if (!this.endpointPrefix && endpointVar !== endpoint) {
+            // Extract the prefix that worked
+            const prefix = endpointVar.replace(endpoint, '').replace(/\/$/, '');
+            this.endpointPrefix = prefix ? `${prefix}/` : '';
+            console.log(`[API] Found working endpoint prefix: ${this.endpointPrefix || 'none'}`);
+          }
+          return response.data;
+        }
+
+        // If 404, try next variation
+        if (response.status === 404) {
+          continue;
+        }
+
+        // Other errors, throw
+        throw { 
+          message: 'Invalid response', 
+          status: response.status, 
+          data: response.data, 
+          error: `HTTP ${response.status}` 
+        };
+      } catch (error) {
+        // If it's the last variation, throw the error
+        if (endpointVar === endpointVariations[endpointVariations.length - 1]) {
+          const status = error.response?.status || error.status;
+          const data = error.response?.data || error.data;
+          console.error(`[API GET] All variations failed for: ${endpoint}`);
+          console.error(`[API GET] Last error - Status: ${status}`, data);
+          throw { 
+            message: 'Invalid response', 
+            status, 
+            data, 
+            error: error.message || error.error 
+          };
+        }
+        // Otherwise, continue to next variation
+        continue;
+      }
     }
   }
 
