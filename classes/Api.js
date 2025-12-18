@@ -3,87 +3,86 @@ import { config } from '../utils/config.js';
 
 export class Api {
   constructor() {
-    // Base URL - try without /v1/ first, then fallback
-    this.baseUrl = 'https://snakessh.sellhub.cx/api/';
+    // Base URL according to official docs: https://dash.sellhub.cx/api/sellhub/
+    this.baseUrl = 'https://dash.sellhub.cx/api/sellhub/';
     this.apiKey = config.SH_API_KEY;
     this.shopId = config.SH_SHOP_ID;
     this.endpointPrefix = ''; // Will be determined dynamically
   }
 
   async get(endpoint, params = {}) {
-    // Based on SellHub docs and dashboard URL structure
-    // Dashboard: https://dash.sellhub.cx/{shopId}/products/...
-    // Try multiple endpoint structures and base URLs
-    // First, try different base URLs - maybe API is not under /api/
-    const baseUrls = [
-      `https://snakessh.sellhub.cx/`, // Direct domain (no /api/)
-      `https://snakessh.sellhub.cx/api/`, // Standard API path
-      `https://dash.sellhub.cx/`, // Direct dash domain
-      `https://dash.sellhub.cx/api/`, // Dash with API
-      `https://api.sellhub.cx/`, // API subdomain
-      `https://api.sellhub.cx/v1/`, // API subdomain with v1
-      `https://snakessh.sellhub.cx/api/${this.shopId}/`, // Shop-specific API
-      `https://dash.sellhub.cx/api/${this.shopId}/` // Shop-specific API on dash
-    ];
+    // According to official docs: https://dash.sellhub.cx/api/sellhub/{recurso}
+    // Examples: /api/sellhub/customers, /api/sellhub/products
     
-    // Extract resource type from endpoint (products, invoices, etc.)
-    const resourceType = endpoint.includes('products') ? 'products' : 
-                        endpoint.includes('invoices') ? 'invoices' :
-                        endpoint.includes('deliverables') ? 'deliverables' : '';
+    // Extract resource type from endpoint
+    // Endpoints come as: shops/{shopId}/products -> extract 'products'
+    // Or: shops/{shopId}/products/{productId}/deliverables/{variantId} -> extract 'deliverables'
+    let resourceType = '';
+    let resourcePath = '';
     
-    // Then try different endpoint structures (prioritize simple resource names)
-    // Remove duplicates and invalid combinations
+    if (endpoint.includes('/deliverables/')) {
+      // For deliverables: shops/{shopId}/products/{productId}/deliverables/{variantId}
+      // Convert to: products/{productId}/deliverables/{variantId}
+      resourcePath = endpoint.replace(`shops/${this.shopId}/`, '');
+      resourceType = 'deliverables';
+    } else if (endpoint.includes('/products/')) {
+      // For specific product: shops/{shopId}/products/{productId}
+      // Convert to: products/{productId}
+      resourcePath = endpoint.replace(`shops/${this.shopId}/`, '');
+      resourceType = 'products';
+    } else if (endpoint.includes('products')) {
+      resourceType = 'products';
+      resourcePath = 'products';
+    } else if (endpoint.includes('invoices')) {
+      resourceType = 'invoices';
+      resourcePath = 'invoices';
+    } else {
+      // Fallback: try to extract resource type
+      const parts = endpoint.split('/');
+      resourceType = parts[parts.length - 1] || endpoint;
+      resourcePath = endpoint.replace(`shops/${this.shopId}/`, '');
+    }
+    
+    // Build endpoint variations according to docs
     const endpointVariations = [
-      `${this.shopId}/${resourceType}`, // shopId/products (matches dashboard structure)
-      resourceType, // Just products
-      `shops/${this.shopId}/${resourceType}`, // shops/{shopId}/products
-      `api/${this.shopId}/${resourceType}`, // api/shopId/products
-      `api/shops/${this.shopId}/${resourceType}`, // api/shops/{shopId}/products
-      `sellhub/shops/${this.shopId}/${resourceType}`, // From docs: sellhub/shops/{shopId}/products
-      `sellhub/${resourceType}`, // sellhub/products
-      `v1/${this.shopId}/${resourceType}`, // v1/shopId/products
-      `v1/shops/${this.shopId}/${resourceType}`, // v1/shops/{shopId}/products
-      endpoint // Original: shops/{shopId}/products
+      resourcePath, // products, products/{id}, products/{id}/deliverables/{variantId}
+      resourceType, // Just 'products' or 'invoices'
+      endpoint.replace(`shops/${this.shopId}/`, ''), // Remove shop ID prefix
+      endpoint // Original endpoint as fallback
     ];
     
-    // Remove duplicates
-    const uniqueVariations = [...new Set(endpointVariations)];
+    // Remove duplicates and empty strings
+    const uniqueVariations = [...new Set(endpointVariations)].filter(e => e && e.trim() !== '');
 
     let lastError = null;
-    let attemptCount = 0;
-    const maxAttempts = baseUrls.length * uniqueVariations.length;
     
-    // Try each base URL with each endpoint variation
-    for (const baseUrl of baseUrls) {
-      for (let i = 0; i < uniqueVariations.length; i++) {
-        const endpointVar = uniqueVariations[i];
-        attemptCount++;
+    // Try each endpoint variation with the official base URL
+    for (let i = 0; i < uniqueVariations.length; i++) {
+      const endpointVar = uniqueVariations[i];
+      
+      // Skip if endpoint doesn't make sense for this variation
+      if (endpoint.includes('products') && endpointVar.includes('invoices')) continue;
+      if (endpoint.includes('invoices') && endpointVar.includes('products')) continue;
+      
+      try {
+        const url = `${this.baseUrl}${endpointVar}`;
+        const fullUrl = params && Object.keys(params).length > 0 
+          ? `${url}?${new URLSearchParams(params).toString()}`
+          : url;
+        console.log(`[API GET] [${i + 1}/${uniqueVariations.length}] Trying: ${fullUrl}`);
+        console.log(`[API GET] Endpoint: ${endpointVar}`);
+        console.log(`[API GET] Headers: Authorization=${this.apiKey.substring(0, 30)}...`);
         
-        // Skip if endpoint doesn't make sense for this variation
-        if (endpoint.includes('products') && endpointVar.includes('invoices')) continue;
-        if (endpoint.includes('invoices') && endpointVar.includes('products')) continue;
-        if (endpoint.includes('deliverables') && !endpointVar.includes('deliverables') && resourceType === 'deliverables') continue;
-        
-        try {
-          const url = `${baseUrl}${endpointVar}`;
-          const fullUrl = params && Object.keys(params).length > 0 
-            ? `${url}?${new URLSearchParams(params).toString()}`
-            : url;
-          console.log(`[API GET] [${attemptCount}/${maxAttempts}] Trying: ${fullUrl}`);
-          console.log(`[API GET] Base: ${baseUrl}, Endpoint: ${endpointVar}`);
-          console.log(`[API GET] Headers: Authorization=${this.apiKey.substring(0, 20)}..., X-API-Key=${this.apiKey.substring(0, 20)}...`);
-          
-          const response = await axios.get(url, {
-            headers: { 
-              'Authorization': this.apiKey, // According to docs: without Bearer prefix
-              'X-API-Key': this.apiKey,
-              'Accept': 'application/json',
-              'Content-Type': 'application/json'
-            },
-        params: params,
-            timeout: 15000,
-            validateStatus: (status) => status < 500 // Don't throw on 4xx, we'll handle it
-          });
+        const response = await axios.get(url, {
+          headers: { 
+            'Authorization': this.apiKey, // According to docs: without Bearer prefix
+            'Accept': 'application/json',
+            'Content-Type': 'application/json'
+          },
+          params: params,
+          timeout: 15000,
+          validateStatus: (status) => status < 500 // Don't throw on 4xx, we'll handle it
+        });
 
         console.log(`[API GET] Response status: ${response.status}`);
         console.log(`[API GET] Response content-type: ${response.headers['content-type'] || 'unknown'}`);
@@ -108,19 +107,13 @@ export class Api {
           }
         }
         
-        // If we get a successful response, cache this endpoint structure and base URL
+        // If we get a successful response, cache this endpoint structure
         if (response.status === 200 || response.status === 201) {
-          // Cache the working base URL
-          if (baseUrl !== this.baseUrl) {
-            this.baseUrl = baseUrl;
-            console.log(`[API] ✅ Found working base URL: ${baseUrl}`);
-          }
-          
           if (!this.endpointPrefix && endpointVar !== endpoint) {
             // Extract the prefix that worked
             const prefix = endpointVar.replace(endpoint, '').replace(/\/$/, '');
             this.endpointPrefix = prefix ? `${prefix}/` : '';
-            console.log(`[API] ✅ Found working endpoint prefix: ${this.endpointPrefix || 'none'}`);
+            console.log(`[API] ✅ Found working endpoint structure: ${endpointVar}`);
           }
           
           const dataType = Array.isArray(response.data) ? 'array' : typeof response.data;
