@@ -3,6 +3,7 @@ import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { AdvancedCommandLogger } from '../utils/advancedCommandLogger.js';
 import { ErrorLog } from '../utils/errorLogger.js';
+import { parseDeliverables } from '../utils/parseDeliverables.js';
 
 const variantsDataPath = join(process.cwd(), 'variantsData.json');
 
