@@ -3,7 +3,8 @@ import { config } from '../utils/config.js';
 
 export class Api {
   constructor() {
-    this.baseUrl = 'https://snakessh.sellhub.cx/api/';
+    // Try different base URLs - SellHub might use different structure
+    this.baseUrl = 'https://snakessh.sellhub.cx/api/v1/';
     this.apiKey = config.SH_API_KEY;
     this.shopId = config.SH_SHOP_ID;
   }
