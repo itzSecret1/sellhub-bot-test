@@ -159,14 +159,14 @@ export class Bot {
       for (let i = 0; i < this.slashCommands.length; i++) {
         const cmd = this.slashCommands[i];
         try {
-          await guild.commands.create(cmd.data.toJSON());
+          await guild.commands.create(cmd);
           success++;
-          console.log(`[BOT] ✅ Created: ${cmd.data.name} (${i + 1}/${this.slashCommands.length})`);
+          console.log(`[BOT] ✅ Created: ${cmd.name} (${i + 1}/${this.slashCommands.length})`);
           // Increase delay slightly to avoid rate limits
           await new Promise(r => setTimeout(r, 500));
         } catch (err) {
           failed++;
-          console.error(`[BOT] ❌ Failed: ${cmd.data.name} - ${err.message}`);
+          console.error(`[BOT] ❌ Failed: ${cmd.name} - ${err.message}`);
           // Continue with next command even if one fails
           await new Promise(r => setTimeout(r, 200));
         }
