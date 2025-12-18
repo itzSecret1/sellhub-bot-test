@@ -168,6 +168,10 @@ export class Bot {
         const guildId = config.BOT_GUILD_ID;
         
         console.log(`[BOT] 🚀 Attempting to register ${this.slashCommands.length} commands...`);
+        console.log(`[BOT] 📍 Client ID: ${clientId}, Guild ID: ${guildId}`);
+        console.log(`[BOT] 📋 First 5 commands: ${this.slashCommands.slice(0, 5).map(c => c.name).join(', ')}`);
+        
+        const startTime = Date.now();
         const data = await Promise.race([
           rest.put(
             Routes.applicationGuildCommands(clientId, guildId),
@@ -178,13 +182,44 @@ export class Bot {
           )
         ]);
         
-        console.log(`[BOT] ✅ Successfully registered ${data.length} commands via REST API!`);
+        const duration = Date.now() - startTime;
+        console.log(`[BOT] ✅ Successfully registered ${data.length} commands via REST API! (${duration}ms)`);
         console.log(`[BOT] 📝 Commands: ${data.map(c => c.name).join(', ')}`);
+        
+        // Verify registration immediately
+        try {
+          console.log(`[BOT] 🔍 Verifying registration...`);
+          const verified = await rest.get(Routes.applicationGuildCommands(clientId, guildId));
+          console.log(`[BOT] ✅ Verification: ${verified.length} commands confirmed in Discord`);
+          if (verified.length !== data.length) {
+            console.log(`[BOT] ⚠️  WARNING: Registered ${data.length} but verified ${verified.length}`);
+          }
+        } catch (verifyError) {
+          console.log(`[BOT] ⚠️  Could not verify: ${verifyError.message}`);
+        }
+        
         this.isRegisteringCommands = false;
         return;
       } catch (error) {
+        console.error(`[BOT] ❌ Registration error details:`);
+        console.error(`[BOT]    Error message: ${error.message}`);
+        console.error(`[BOT]    Error code: ${error.code || 'N/A'}`);
+        console.error(`[BOT]    Error status: ${error.status || 'N/A'}`);
+        if (error.rawError) {
+          console.error(`[BOT]    Raw error:`, JSON.stringify(error.rawError, null, 2));
+        }
+        if (error.response) {
+          console.error(`[BOT]    Response status: ${error.response.status}`);
+          console.error(`[BOT]    Response data:`, JSON.stringify(error.response.data, null, 2));
+        }
+        
         if (error.code === 30034) {
           console.error(`[BOT] ❌ RATE LIMIT: Still blocked - wait 24-48 hours or try again later`);
+        } else if (error.code === 50001) {
+          console.error(`[BOT] ❌ MISSING ACCESS: Bot needs 'applications.commands' scope`);
+          console.error(`[BOT] 💡 Add scope in Discord Developer Portal > OAuth2 > URL Generator`);
+        } else if (error.code === 10004) {
+          console.error(`[BOT] ❌ UNKNOWN GUILD: Check BOT_GUILD_ID (current: ${config.BOT_GUILD_ID})`);
         } else {
           console.error(`[BOT] ⚠️  REST API failed: ${error.message}`);
           console.log(`[BOT] 🔄 Falling back to individual registration...`);
