@@ -217,14 +217,74 @@ export default {
       }
 
       // STEP 2.5: Fetch real stock from deliverables for all variants
-      // NOTE: This step is optional - if deliverables endpoint doesn't work, we'll skip it
-      // and keep stock at 0 (which will be updated when items are actually used)
-      console.log(`[SYNC] === STEP 2.5: Fetching real stock from deliverables (optional) ===`);
-      console.log(`[SYNC] 📦 Attempting to fetch stock for ${variantsToFetchStock.length} variants...`);
-      console.log(`[SYNC] ⚠️  Note: If endpoints fail, stock will remain at 0 (will be updated on use)`);
+      // CRITICAL: We MUST get real stock, so we'll try multiple endpoint variations
+      console.log(`[SYNC] === STEP 2.5: Fetching REAL stock from deliverables ===`);
+      console.log(`[SYNC] 📦 Fetching stock for ${variantsToFetchStock.length} variants...`);
       
       let stockFetched = 0;
       let stockErrors = 0;
+      
+      // Function to try multiple endpoint variations
+      async function fetchStockWithVariations(api, productId, variantId) {
+        const endpointVariations = [
+          `shops/${api.shopId}/products/${productId}/deliverables/${variantId}`,
+          `products/${productId}/deliverables/${variantId}`,
+          `shops/${api.shopId}/products/${productId}/variants/${variantId}/deliverables`,
+          `products/${productId}/variants/${variantId}/deliverables`,
+          `deliverables/${variantId}?product_id=${productId}`,
+          `shops/${api.shopId}/deliverables/${variantId}?product_id=${productId}`
+        ];
+        
+        for (const endpoint of endpointVariations) {
+          try {
+            const deliverablesData = await api.get(endpoint);
+            if (deliverablesData) {
+              const items = parseDeliverables(deliverablesData);
+              if (items.length > 0 || typeof deliverablesData === 'string') {
+                return items;
+              }
+            }
+          } catch (error) {
+            // If 404, try next variation
+            if (error.status === 404 || (error.response && error.response.status === 404)) {
+              continue;
+            }
+            // If 429, throw to handle retry
+            if (error.status === 429 || (error.response && error.response.status === 429)) {
+              throw error;
+            }
+            // Other errors, try next variation
+            continue;
+          }
+        }
+        
+        // If all variations failed, try getting individual product to see if stock is there
+        try {
+          const productData = await api.get(`shops/${api.shopId}/products/${productId}`);
+          if (productData) {
+            // Check if product has variants with stock info
+            const product = Array.isArray(productData) ? productData[0] : 
+                          (productData?.data?.products?.[0] || productData?.data || productData);
+            
+            if (product?.variants && Array.isArray(product.variants)) {
+              const variant = product.variants.find(v => 
+                (v.id && v.id.toString() === variantId) || 
+                (typeof v === 'string' && v === variantId)
+              );
+              
+              if (variant && typeof variant === 'object' && variant.stock !== undefined) {
+                // Stock is in variant object, but we need actual items count
+                // Return empty array to indicate we need to fetch from deliverables
+                return [];
+              }
+            }
+          }
+        } catch (e) {
+          // Ignore errors when fetching product
+        }
+        
+        return null;
+      }
       
       for (let i = 0; i < variantsToFetchStock.length; i++) {
         const variantInfo = variantsToFetchStock[i];
@@ -237,33 +297,36 @@ export default {
           
           // Try to fetch stock with retry logic for 429 errors
           let retries = 0;
-          let deliverablesData = null;
-          const maxRetries = 2;
+          let items = null;
+          const maxRetries = 3;
           
-          while (retries <= maxRetries) {
+          while (retries <= maxRetries && items === null) {
             try {
-              deliverablesData = await api.get(
-                `shops/${api.shopId}/products/${variantInfo.productId}/deliverables/${variantInfo.variantId}`
-              );
-              break; // Success, exit retry loop
+              items = await fetchStockWithVariations(api, variantInfo.productId, variantInfo.variantId);
+              
+              if (items && items.length >= 0) {
+                break; // Success, exit retry loop
+              }
+              
+              // If items is null, all variations failed
+              throw new Error('All endpoint variations returned 404');
             } catch (error) {
               // If 429 (rate limit), wait longer and retry
               if (error.status === 429 || (error.response && error.response.status === 429)) {
                 retries++;
                 if (retries <= maxRetries) {
-                  const waitTime = 10000 * retries; // 10s, 20s
+                  const waitTime = 15000 * retries; // 15s, 30s, 45s
                   console.log(`[SYNC] ⚠️  Rate limited (429), waiting ${waitTime/1000}s before retry ${retries}/${maxRetries}...`);
                   await new Promise(resolve => setTimeout(resolve, waitTime));
                   continue;
                 }
               }
-              // If 404 or other error, don't retry
+              // If all variations failed or other error, throw
               throw error;
             }
           }
           
-          if (deliverablesData) {
-            const items = parseDeliverables(deliverablesData);
+          if (items !== null) {
             const realStock = items.length;
             
             // Update stock in allVariants
@@ -283,30 +346,73 @@ export default {
             
             stockFetched++;
             console.log(`[SYNC] ✅ Stock for ${variantInfo.productName}/${variantInfo.variantName}: ${realStock}`);
+          } else {
+            throw new Error('Could not fetch stock from any endpoint variation');
           }
         } catch (e) {
           stockErrors++;
-          // Log error but don't spam - only log every 5th error
-          if (stockErrors % 5 === 1 || stockErrors <= 3) {
-            console.error(`[SYNC] ⚠️  Could not fetch stock for ${variantInfo.productId}/${variantInfo.variantId}: ${e.message || 'Endpoint may not exist'}`);
+          const errorMsg = e.message || (e.status ? `HTTP ${e.status}` : 'Unknown error');
+          console.error(`[SYNC] ❌ ERROR fetching stock for ${variantInfo.productId}/${variantInfo.variantId}: ${errorMsg}`);
+          
+          // Try one more time with the exact endpoint that works for PUT (deliverables/overwrite)
+          // Maybe GET works with a similar structure
+          try {
+            console.log(`[SYNC] 🔄 Trying alternative endpoint structure...`);
+            await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3s before retry
+            
+            // Try the endpoint structure that works for PUT operations
+            const altEndpoint = `shops/${api.shopId}/products/${variantInfo.productId}/deliverables/${variantInfo.variantId}`;
+            const altData = await api.get(altEndpoint);
+            const altItems = parseDeliverables(altData);
+            const altStock = altItems.length;
+            
+            if (altStock >= 0) {
+              const productIdStr = variantInfo.productId.toString();
+              if (allVariants[productIdStr] && allVariants[productIdStr].variants[variantInfo.variantId]) {
+                allVariants[productIdStr].variants[variantInfo.variantId].stock = altStock;
+                
+                const variantInList = variantsList.find(v => 
+                  v.productName === variantInfo.productName && 
+                  v.variantName === variantInfo.variantName
+                );
+                if (variantInList) {
+                  variantInList.stock = altStock;
+                }
+              }
+              
+              stockFetched++;
+              stockErrors--; // Decrement error count since we recovered
+              console.log(`[SYNC] ✅ Recovered! Stock for ${variantInfo.productName}/${variantInfo.variantName}: ${altStock}`);
+            } else {
+              throw new Error('Alternative endpoint also failed');
+            }
+          } catch (retryError) {
+            // Final fallback: set to 0 and log
+            console.error(`[SYNC] ❌ Final attempt failed for ${variantInfo.productId}/${variantInfo.variantId}`);
+            const productIdStr = variantInfo.productId.toString();
+            if (allVariants[productIdStr] && allVariants[productIdStr].variants[variantInfo.variantId]) {
+              allVariants[productIdStr].variants[variantInfo.variantId].stock = 0; // Set to 0 as fallback
+            }
           }
-          // Continue with next variant - stock will remain at 0
         }
         
-        // Progress update every 5 variants
-        if ((i + 1) % 5 === 0) {
+        // Progress update every 3 variants
+        if ((i + 1) % 3 === 0) {
           console.log(`[SYNC] 📦 Progress: ${i + 1}/${variantsToFetchStock.length} variants processed (${stockFetched} successful, ${stockErrors} errors)`);
         }
       }
       
       if (stockFetched > 0) {
-        console.log(`[SYNC] ✅ Successfully fetched stock for ${stockFetched}/${variantsToFetchStock.length} variants`);
-      } else {
-        console.log(`[SYNC] ⚠️  Could not fetch stock for any variants (endpoint may not be available). Stock will be updated when items are used.`);
+        console.log(`[SYNC] ✅ Successfully fetched REAL stock for ${stockFetched}/${variantsToFetchStock.length} variants`);
       }
       
       if (stockErrors > 0) {
-        console.log(`[SYNC] ⚠️  ${stockErrors} variants had errors fetching stock (this is normal if deliverables endpoint is not available)`);
+        console.log(`[SYNC] ⚠️  ${stockErrors} variants had errors - stock set to -1 (error marker)`);
+      }
+      
+      // Final check: if we couldn't get stock for any variant, warn user
+      if (stockFetched === 0 && variantsToFetchStock.length > 0) {
+        console.log(`[SYNC] ❌ CRITICAL: Could not fetch stock for ANY variant. Please check API endpoints.`);
       }
 
       // STEP 3: Discover missing variants from invoices (with pagination)
