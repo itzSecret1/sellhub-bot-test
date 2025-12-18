@@ -15,12 +15,18 @@ export default {
   requiredRole: 'admin',
 
   async execute(interaction, api) {
+    // CRITICAL: Defer reply FIRST to prevent timeout
+    try {
+      if (!interaction.deferred && !interaction.replied) {
+        await interaction.deferReply({ ephemeral: true });
+      }
+    } catch (deferError) {
+      console.error(`[SYNC] Failed to defer reply: ${deferError.message}`);
+      return;
+    }
+    
     try {
       await AdvancedCommandLogger.logCommand(interaction, 'sync-variants');
-      // Quick response to prevent timeout
-      if (!interaction.deferred && !interaction.replied) {
-        await interaction.deferReply({ ephemeral: true }).catch(() => {});
-      }
 
       const startTime = Date.now();
       const allVariants = {};

@@ -53,7 +53,16 @@ export class Bot {
         const registered = await guild.commands.fetch();
         const expectedCount = 35; // Update this if you add/remove commands
         
-        console.log(`[BOT] 📊 Currently registered: ${registered.size} commands`);
+        // Check for duplicates
+        const commandNames = Array.from(registered.values()).map(c => c.name);
+        const uniqueNames = new Set(commandNames);
+        if (commandNames.length !== uniqueNames.size) {
+          const duplicates = commandNames.filter((name, index) => commandNames.indexOf(name) !== index);
+          console.log(`[BOT] ⚠️  WARNING: Found duplicate commands: ${[...new Set(duplicates)].join(', ')}`);
+          console.log(`[BOT] 💡 Run: node clean-duplicate-commands.js to remove duplicates`);
+        }
+        
+        console.log(`[BOT] 📊 Currently registered: ${registered.size} commands (${uniqueNames.size} unique)`);
         
         if (registered.size < expectedCount * 0.8) {
           console.log(`[BOT] ⚠️  Only ${registered.size} commands registered (expected ~${expectedCount})`);
