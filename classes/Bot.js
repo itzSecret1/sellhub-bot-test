@@ -155,12 +155,42 @@ export class Bot {
 
       console.log(`[BOT] ✅ Loaded ${this.slashCommands.length} commands into memory`);
       
-      // DISABLED: This bot token is blocked by Discord for command registration
-      // All registration attempts timeout - user MUST create a new bot token
-      console.log(`[BOT] ⚠️  Command registration DISABLED - Bot token is blocked`);
-      console.log(`[BOT] 💡 See CREAR_NUEVO_BOT.md for instructions to create new bot token`);
-      this.isRegisteringCommands = false;
-      return;
+      // Try to register commands automatically with new token
+      if (!this.client.user || !this.client.user.id) {
+        await new Promise(r => setTimeout(r, 2000));
+      }
+      
+      // Use REST API for faster registration
+      try {
+        const rest = new REST({ version: '10' }).setToken(config.BOT_TOKEN);
+        const clientId = this.client.user.id;
+        const guildId = config.BOT_GUILD_ID;
+        
+        console.log(`[BOT] 🚀 Attempting to register ${this.slashCommands.length} commands...`);
+        const data = await Promise.race([
+          rest.put(
+            Routes.applicationGuildCommands(clientId, guildId),
+            { body: this.slashCommands }
+          ),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('REST API timeout (20s)')), 20000)
+          )
+        ]);
+        
+        console.log(`[BOT] ✅ Successfully registered ${data.length} commands via REST API!`);
+        console.log(`[BOT] 📝 Commands: ${data.map(c => c.name).join(', ')}`);
+        this.isRegisteringCommands = false;
+        return;
+      } catch (error) {
+        if (error.code === 30034) {
+          console.error(`[BOT] ❌ RATE LIMIT: Still blocked - wait 24-48 hours or try again later`);
+        } else {
+          console.error(`[BOT] ⚠️  REST API failed: ${error.message}`);
+          console.log(`[BOT] 🔄 Falling back to individual registration...`);
+          // Fallback to individual registration
+          await this.registerIndividualCommands();
+        }
+      }
       
     } catch (error) {
       console.error('[BOT] Error loading commands:', error.message);
