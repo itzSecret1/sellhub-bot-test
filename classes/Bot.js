@@ -40,6 +40,11 @@ export class Bot {
     this.autoSyncScheduler = createAutoSyncScheduler(client, api);
     this.predictiveAlerts = createPredictiveAlerts(client);
 
+    // CRITICAL: Load commands IMMEDIATELY before login
+    this.loadCommandsSync().catch(err => {
+      console.error(`[BOT] ❌ Failed to load commands: ${err.message}`);
+    });
+
     this.loginWithRetry();
 
     this.client.on('ready', async () => {
@@ -163,13 +168,12 @@ export class Bot {
     }
   }
 
-  async registerSlashCommands() {
-    // This method loads commands into memory AND optionally registers them
-    if (this.isRegisteringCommands) {
-      console.log(`[BOT] ⚠️  Already registering commands, skipping...`);
+  async loadCommandsSync() {
+    // This method ONLY loads commands into memory (does NOT register them)
+    if (this.slashCommandsMap.size > 0) {
+      console.log(`[BOT] ⚠️  Commands already loaded, skipping...`);
       return;
     }
-    this.isRegisteringCommands = true;
 
     try {
       // Clear existing maps
@@ -189,20 +193,42 @@ export class Bot {
             if (!this.slashCommandsMap.has(cmdName)) {
               this.slashCommands.push(command.default.data.toJSON());
               this.slashCommandsMap.set(cmdName, command.default);
-              console.log(`[BOT] ✅ Loaded command: ${cmdName} from ${file}`);
+              console.log(`[BOT] ✅ Loaded: ${cmdName}`);
             } else {
-              console.log(`[BOT] ⚠️  Duplicate command name skipped: ${cmdName} from ${file}`);
+              console.log(`[BOT] ⚠️  Duplicate skipped: ${cmdName} from ${file}`);
             }
           } else {
-            console.log(`[BOT] ⚠️  Invalid command structure in ${file}`);
+            console.log(`[BOT] ⚠️  Invalid structure: ${file}`);
           }
         } catch (err) {
           console.error(`[BOT] ❌ Error loading ${file}:`, err.message);
-          console.error(`[BOT]    Stack:`, err.stack?.split('\n').slice(0, 3).join('\n'));
         }
       }
 
       console.log(`[BOT] ✅ Loaded ${this.slashCommands.length} commands into memory`);
+      console.log(`[BOT] 📝 Commands: ${Array.from(this.slashCommandsMap.keys()).join(', ')}`);
+    } catch (error) {
+      console.error('[BOT] Error loading commands:', error.message);
+      throw error;
+    }
+  }
+
+  async registerSlashCommands() {
+    // This method registers already-loaded commands to Discord
+    if (this.isRegisteringCommands) {
+      console.log(`[BOT] ⚠️  Already registering commands, skipping...`);
+      return;
+    }
+    this.isRegisteringCommands = true;
+
+    try {
+      // Ensure commands are loaded
+      if (this.slashCommands.length === 0) {
+        console.log(`[BOT] ⚠️  No commands loaded, loading now...`);
+        await this.loadCommandsSync();
+      }
+
+      console.log(`[BOT] ✅ Using ${this.slashCommands.length} pre-loaded commands`);
       
       // Try to register commands automatically with new token
       if (!this.client.user || !this.client.user.id) {
