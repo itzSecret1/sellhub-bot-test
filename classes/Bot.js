@@ -459,11 +459,28 @@ export class Bot {
           throw new NotWhitelistedException();
         }
       } catch (error) {
-        console.error(error);
-        if (error.message.includes('permission')) {
-          interaction.reply({ content: error.toString(), ephemeral: true }).catch(console.error);
+        console.error(`[BOT] Command error (${interaction.commandName}):`, error);
+        console.error(`[BOT] Error stack:`, error.stack?.split('\n').slice(0, 5).join('\n'));
+        
+        // Handle error response based on interaction state
+        const errorMsg = error.message?.includes('permission') 
+          ? error.toString() 
+          : `❌ Error ejecutando el comando: ${error.message || 'Error desconocido'}`;
+        
+        if (interaction.deferred || interaction.replied) {
+          // Already responded, try to edit
+          await interaction.editReply({ content: errorMsg }).catch(err => {
+            console.error(`[BOT] Failed to edit error reply: ${err.message}`);
+          });
         } else {
-          interaction.reply({ content: 'An error occurred while executing the command.', ephemeral: true }).catch(console.error);
+          // Not responded yet, send new reply
+          await interaction.reply({ content: errorMsg, ephemeral: true }).catch(err => {
+            console.error(`[BOT] Failed to send error reply: ${err.message}`);
+            // Last resort: try to follow up
+            if (interaction.isRepliable()) {
+              interaction.followUp({ content: errorMsg, ephemeral: true }).catch(() => {});
+            }
+          });
         }
       }
     });
