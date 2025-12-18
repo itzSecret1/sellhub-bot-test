@@ -38,7 +38,7 @@ export default {
             { name: '🏢 Current Guild', value: interaction.guild.name, inline: false },
             { name: '✅ Status', value: 'Online and operational', inline: false }
           )
-          .setFooter({ text: 'SellAuth Bot | System Status' })
+          .setFooter({ text: 'SellHub Bot | System Status' })
           .setTimestamp();
 
         await AdvancedCommandLogger.logCommand(interaction, 'status', {

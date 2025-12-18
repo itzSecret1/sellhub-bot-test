@@ -34,7 +34,7 @@ export class StatusReporter {
       const embed = new EmbedBuilder()
         .setColor(0xff4444) // Red for offline
         .setTitle('🔴 Bot Status: OFFLINE - Recovery in Progress')
-        .setDescription('The SellAuth Discord Bot is temporarily offline due to Discord session limits.')
+        .setDescription('The SellHub Discord Bot is temporarily offline due to Discord session limits.')
         .addFields(
           {
             name: '⏱️ Expected Reconnection',
@@ -59,7 +59,7 @@ export class StatusReporter {
           }
         )
         .setFooter({
-          text: 'SellAuth Bot Status System',
+          text: 'SellHub Bot Status System',
           iconURL: 'https://cdn.discordapp.com/app-icons/1009849347124862193/2a07cee6e1c97f4ac1cbc8c8ef0b2d1c.png'
         })
         .setTimestamp();
@@ -98,7 +98,7 @@ export class StatusReporter {
       const embed = new EmbedBuilder()
         .setColor(0x00ff00) // Green for online
         .setTitle('🟢 Bot Status: ONLINE & OPERATIONAL')
-        .setDescription('The SellAuth Discord Bot is running smoothly and ready for use.')
+        .setDescription('The SellHub Discord Bot is running smoothly and ready for use.')
         .addFields(
           {
             name: '✅ Status',
@@ -123,7 +123,7 @@ export class StatusReporter {
           }
         )
         .setFooter({
-          text: 'SellAuth Bot Status System | Daily Status Check',
+          text: 'SellHub Bot Status System | Daily Status Check',
           iconURL: 'https://cdn.discordapp.com/app-icons/1009849347124862193/2a07cee6e1c97f4ac1cbc8c8ef0b2d1c.png'
         })
         .setTimestamp();

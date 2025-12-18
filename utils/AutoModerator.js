@@ -62,7 +62,7 @@ export class AutoModerator {
                 value: 'Message deleted'
               }
             )
-            .setFooter({ text: 'SellAuth Bot Auto-Moderation' })
+            .setFooter({ text: 'SellHub Bot Auto-Moderation' })
             .setTimestamp();
 
           try {
@@ -97,7 +97,7 @@ export class AutoModerator {
                 value: new Date().toUTCString()
               }
             )
-            .setFooter({ text: 'SellAuth Bot Auto-Moderation' })
+            .setFooter({ text: 'SellHub Bot Auto-Moderation' })
             .setTimestamp();
 
           const modChannel = this.client.channels.cache.get(MODLOG_CHANNEL_ID);

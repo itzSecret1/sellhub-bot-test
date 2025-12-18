@@ -62,7 +62,7 @@ export default {
           .setColor(0x0099ff)
           .setTitle('📋 Server Audit Log')
           .setDescription(`Type: ${eventType === 'all' ? 'All Events' : eventType}`)
-          .setFooter({ text: 'SellAuth Bot | Audit Log' })
+          .setFooter({ text: 'SellHub Bot | Audit Log' })
           .setTimestamp();
 
         // Add logs

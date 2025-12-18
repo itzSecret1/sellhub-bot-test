@@ -75,7 +75,7 @@ export default {
             { name: '📝 Razón', value: reason, inline: false },
             { name: '✓ Admin', value: userEmail, inline: true }
           )
-          .setFooter({ text: 'SellAuth Bot | Balance Management' })
+          .setFooter({ text: 'SellHub Bot | Balance Management' })
           .setTimestamp();
 
         // Add old and new balance if available

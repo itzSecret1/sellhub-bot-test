@@ -7,8 +7,8 @@ let config = {
   BOT_CUSTOMER_ROLE_ID: process.env.BOT_CUSTOMER_ROLE_ID || '',
   BOT_STAFF_ROLE_ID: process.env.BOT_STAFF_ROLE_ID || '',
   BOT_ADMIN_ROLE_ID: process.env.BOT_ADMIN_ROLE_ID || '',
-  SA_API_KEY: process.env.SA_API_KEY || '',
-  SA_SHOP_ID: process.env.SA_SHOP_ID || '',
+  SH_API_KEY: process.env.SH_API_KEY || '',
+  SH_SHOP_ID: process.env.SH_SHOP_ID || '',
   LOG_CHANNEL_ID: process.env.LOG_CHANNEL_ID || ''
 };
 

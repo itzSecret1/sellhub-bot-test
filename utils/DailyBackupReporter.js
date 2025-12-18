@@ -111,7 +111,7 @@ export class DailyBackupReporter {
           }
         )
         .setFooter({
-          text: 'SellAuth Bot Backup System',
+          text: 'SellHub Bot Backup System',
           iconURL: 'https://cdn.discordapp.com/app-icons/1009849347124862193/2a07cee6e1c97f4ac1cbc8c8ef0b2d1c.png'
         })
         .setTimestamp();

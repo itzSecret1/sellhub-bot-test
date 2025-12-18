@@ -61,7 +61,7 @@ export default {
           }
         )
         .setFooter({
-          text: '🤖 Powered by SellAuth AI Analytics',
+          text: '🤖 Powered by SellHub AI Analytics',
           iconURL: interaction.user.displayAvatarURL()
         })
         .setTimestamp();

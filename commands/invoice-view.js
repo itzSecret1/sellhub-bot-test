@@ -129,7 +129,7 @@ export default {
         // Check if invoice was found
         if (!invoiceData || !foundOnPage) {
           await interaction.editReply({
-            content: `❌ Invoice **no encontrado**: \`${cleanId}\`\n\n💡 Verifica:\n  • El ID sea correcto\n  • El invoice exista en el sistema SellAuth\n  • Contacta al admin si el problema persiste`
+            content: `❌ Invoice **no encontrado**: \`${cleanId}\`\n\n💡 Verifica:\n  • El ID sea correcto\n  • El invoice exista en el sistema SellHub\n  • Contacta al admin si el problema persiste`
           });
 
           await AdvancedCommandLogger.logCommand(interaction, 'invoice-view', {
@@ -269,7 +269,7 @@ export default {
           });
         }
 
-        embed.setFooter({ text: 'SellAuth Bot | Invoice Lookup' })
+        embed.setFooter({ text: 'SellHub Bot | Invoice Lookup' })
           .setTimestamp();
 
         await interaction.editReply({ embeds: [embed] });

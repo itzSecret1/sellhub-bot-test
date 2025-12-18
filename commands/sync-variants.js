@@ -9,7 +9,7 @@ const variantsDataPath = join(process.cwd(), 'variantsData.json');
 export default {
   data: new SlashCommandBuilder()
     .setName('sync-variants')
-    .setDescription('Sync all product variants from SellAuth (Admin only)'),
+    .setDescription('Sync all product variants from SellHub (Admin only)'),
 
   onlyWhitelisted: true,
   requiredRole: 'admin',

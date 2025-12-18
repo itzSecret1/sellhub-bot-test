@@ -13,7 +13,7 @@ export default {
           new EmbedBuilder()
             .setColor(0x00aa00)
             .setTitle('📚 Bot Help')
-            .setDescription('SellAuth Bot Commands')
+            .setDescription('SellHub Bot Commands')
             .setThumbnail('https://cdn-icons-png.flaticon.com/512/2921/2921222.png'),
 
           new EmbedBuilder()
@@ -66,7 +66,7 @@ export default {
               { name: '/config', value: 'Settings', inline: true },
               { name: '/role-info', value: 'Roles', inline: true }
             )
-            .setFooter({ text: 'SellAuth Bot v1.0 | 22 Commands' })
+            .setFooter({ text: 'SellHub Bot v1.0 | 22 Commands' })
             .setTimestamp()
         ];
 

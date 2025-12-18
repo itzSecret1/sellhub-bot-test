@@ -68,7 +68,7 @@ export default {
               { name: 'Audit Logging', value: config.enableAuditLogging ? '✅ Enabled' : '❌ Disabled', inline: true },
               { name: 'Backup Schedule', value: config.backupSchedule, inline: true }
             )
-            .setFooter({ text: 'SellAuth Bot | Server Configuration' })
+            .setFooter({ text: 'SellHub Bot | Server Configuration' })
             .setTimestamp();
 
           if (config.protectedRoles.length > 0) {
@@ -94,7 +94,7 @@ export default {
               { name: 'Role', value: role.toString(), inline: true },
               { name: 'Reason', value: reason, inline: true }
             )
-            .setFooter({ text: 'SellAuth Bot | Role Protection' })
+            .setFooter({ text: 'SellHub Bot | Role Protection' })
             .setTimestamp();
 
           await AdvancedCommandLogger.logCommand(interaction, 'config', {
@@ -118,7 +118,7 @@ export default {
             .addFields(
               { name: 'Role', value: role.toString(), inline: true }
             )
-            .setFooter({ text: 'SellAuth Bot | Role Protection' })
+            .setFooter({ text: 'SellHub Bot | Role Protection' })
             .setTimestamp();
 
           await AdvancedCommandLogger.logCommand(interaction, 'config', {

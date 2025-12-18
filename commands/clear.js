@@ -119,7 +119,7 @@ export default {
           { name: '🗑️ Eliminados', value: `${deletedCount}/${amount}`, inline: true },
           { name: '👤 Admin', value: admin, inline: true }
         )
-        .setFooter({ text: 'SellAuth Bot | Channel Management' })
+        .setFooter({ text: 'SellHub Bot | Channel Management' })
         .setTimestamp();
 
       await interaction.editReply({ embeds: [embed] });

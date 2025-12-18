@@ -1,10 +1,10 @@
 {
   "type": "module",
-  "name": "sellauth-discord-bot",
+  "name": "sellhub-discord-bot",
   "version": "0.0.1",
-  "description": "A Discord bot for managing SellAuth shops with full product variant support and real-time inventory management",
+  "description": "A Discord bot for managing SellHub shops with full product variant support and real-time inventory management",
   "main": "index.js",
-  "author": "SellAuth",
+  "author": "SellHub",
   "private": true,
   "license": "MIT",
   "homepage": "https://github.com/itzSecret1/sell-auth-bot-test",

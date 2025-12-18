@@ -1,6 +1,6 @@
 {
-  "name": "SellAuth Discord Bot",
-  "description": "A Discord bot for managing SellAuth shops",
-  "repository": "https://github.com/sellauth-com/sellauth-discord-bot",
-  "keywords": ["sellauth", "discordjs"]
+  "name": "SellHub Discord Bot",
+  "description": "A Discord bot for managing SellHub shops",
+  "repository": "https://github.com/itzSecret1/sell-auth-bot-test",
+  "keywords": ["sellhub", "discordjs"]
 }

@@ -3,9 +3,9 @@ import { config } from '../utils/config.js';
 
 export class Api {
   constructor() {
-    this.baseUrl = 'https://api.sellauth.com/v1/';
-    this.apiKey = config.SA_API_KEY;
-    this.shopId = config.SA_SHOP_ID;
+    this.baseUrl = 'https://api.sellhub.cx/v1/';
+    this.apiKey = config.SH_API_KEY;
+    this.shopId = config.SH_SHOP_ID;
   }
 
   async get(endpoint, params = {}) {

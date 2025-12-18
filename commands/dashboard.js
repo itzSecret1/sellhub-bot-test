@@ -52,7 +52,7 @@ export default {
           }
         )
         .setFooter({
-          text: '🚀 Powered by SellAuth AI • Next backup: 03:00 UTC',
+          text: '🚀 Powered by SellHub AI • Next backup: 03:00 UTC',
           iconURL: guild.iconURL()
         })
         .setTimestamp();

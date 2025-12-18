@@ -1,6 +1,6 @@
 /**
  * Centralized deliverables parsing logic
- * Handles multiple response formats from SellAuth API
+ * Handles multiple response formats from SellHub API
  */
 
 export function parseDeliverables(deliverablesData) {

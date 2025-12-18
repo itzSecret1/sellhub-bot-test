@@ -1,7 +1,7 @@
-# SellAuth Discord Bot
+# SellHub Discord Bot
 
 ## Overview
-The SellAuth Discord Bot is a production-ready, highly stable Discord bot with **AI-powered analytics and predictive intelligence**. It manages product stock, automates item replacement, synchronizes product variants with SellAuth, and provides comprehensive automation with intelligent monitoring, professional staff notifications, and advanced moderation. It combines traditional commerce operations with cutting-edge AI for trend analysis, sales predictions, and smart alerts.
+The SellHub Discord Bot is a production-ready, highly stable Discord bot with **AI-powered analytics and predictive intelligence**. It manages product stock, automates item replacement, synchronizes product variants with SellHub, and provides comprehensive automation with intelligent monitoring, professional staff notifications, and advanced moderation. It combines traditional commerce operations with cutting-edge AI for trend analysis, sales predictions, and smart alerts.
 
 ## User Preferences
 I prefer clear, concise, and structured explanations. Focus on high-level decisions and their impact. For coding, prioritize robust error handling, security, and maintainability. When making changes, ensure comprehensive logging is in place and that the system remains stable and performant. I prefer to be informed about critical bug fixes and architectural changes.
@@ -105,7 +105,7 @@ On Command - 📊 Dashboard / Analytics
 ## System Architecture
 The bot operates with a modular command-based structure where each command is an independent module. It includes:
 - **Core `Bot.js` class** for Discord integration and system initialization
-- **`Api.js` class** for SellAuth API interactions
+- **`Api.js` class** for SellHub API interactions
 - **Advanced `AdvancedCommandLogger`** for detailed command tracking
 - **`errorLogger`** for robust error monitoring
 - **AI Analytics Systems** (`SmartAnalytics`, `PredictiveAlerts`) for intelligent insights
@@ -158,7 +158,7 @@ The bot operates with a modular command-based structure where each command is an
 
 ## System Design Choices
 - **Modular Architecture:** Commands and systems isolated for scalability
-- **Centralized API Client:** `Api.js` handles all SellAuth interactions
+- **Centralized API Client:** `Api.js` handles all SellHub interactions
 - **Robust Error Handling:** Comprehensive error coverage with graceful fallbacks
 - **Persistent Storage:** JSON files for state, scheduled tasks, and recovery
 - **Professional Formatting:** Discord embeds for all user-facing output
@@ -173,7 +173,7 @@ The bot operates with a modular command-based structure where each command is an
 
 ## External Dependencies
 - **Discord API:** For bot interactions, commands, and messaging
-- **SellAuth API:** For product, stock, and invoice data management
+- **SellHub API:** For product, stock, and invoice data management
 - **Google Translate API:** For multi-language translation (@vitalets/google-translate-api)
 - **Railway:** Cloud platform for continuous deployment
 - **GitHub:** Version control and source code management

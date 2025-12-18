@@ -1,6 +1,6 @@
 # Railway Deployment Guide
 
-**Professional 24/7 hosting setup for SellAuth Discord Bot**
+**Professional 24/7 hosting setup for SellHub Discord Bot**
 
 ---
 
@@ -34,8 +34,8 @@ The first deployment will fail (no env vars yet). Configure them now:
 | `BOT_STAFF_ROLE_ID` | `1440390892900061336` |
 | `BOT_CUSTOMER_ROLE_ID` | `1440390895462645771` |
 | `BOT_USER_ID_WHITELIST` | *(leave empty)* |
-| `SA_API_KEY` | Your SellAuth API key |
-| `SA_SHOP_ID` | `112723` |
+| `SH_API_KEY` | Your SellHub API key |
+| `SH_SHOP_ID` | Your SellHub shop ID |
 
 **⚠️ Important:**
 - **No quotes** around values
@@ -141,7 +141,7 @@ Ensure your Discord bot has required permissions:
 
 ## ✨ Your Bot is Live!
 
-Your SellAuth Discord bot is now running **24/7** on Railway!
+Your SellHub Discord bot is now running **24/7** on Railway!
 
 - ✅ Auto-reconnects on crashes
 - ✅ Auto-syncs with GitHub changes

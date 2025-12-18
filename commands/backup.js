@@ -62,7 +62,7 @@ export default {
             { name: '👤 Admin', value: admin, inline: true }
           )
           .setDescription(`Usa \`/loadbackup\` para restaurar este backup`)
-          .setFooter({ text: 'SellAuth Bot | Server Management' })
+          .setFooter({ text: 'SellHub Bot | Server Management' })
           .setTimestamp();
 
         // Log success

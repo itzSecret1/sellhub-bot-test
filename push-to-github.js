@@ -62,7 +62,7 @@ async function createRepoAndPush() {
         console.log(`📝 Creating repository ${repoName}...`);
         await octokit.rest.repos.createForAuthenticatedUser({
           name: repoName,
-          description: 'SellAuth Discord Bot - Manage your SellAuth shop from Discord',
+          description: 'SellHub Discord Bot - Manage your SellHub shop from Discord',
           private: false,
           auto_init: false
         });

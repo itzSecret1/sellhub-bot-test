@@ -8,7 +8,7 @@ import { Api } from './classes/Api.js';
 import { config } from './utils/config.js';
 
 // Validate required environment variables
-const requiredVars = ['BOT_TOKEN', 'BOT_GUILD_ID', 'SA_API_KEY', 'SA_SHOP_ID'];
+const requiredVars = ['BOT_TOKEN', 'BOT_GUILD_ID', 'SH_API_KEY', 'SH_SHOP_ID'];
 const missingVars = requiredVars.filter((v) => !process.env[v]);
 
 if (missingVars.length > 0) {

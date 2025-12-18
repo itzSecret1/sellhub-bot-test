@@ -87,7 +87,7 @@ export default {
         }
 
         embed
-          .setFooter({ text: 'SellAuth Bot | Server Management' })
+          .setFooter({ text: 'SellHub Bot | Server Management' })
           .setTimestamp();
 
         // Log success

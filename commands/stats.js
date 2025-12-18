@@ -55,7 +55,7 @@ export default {
               inline: false
             }
           )
-          .setFooter({ text: 'SellAuth Bot | Statistics' })
+          .setFooter({ text: 'SellHub Bot | Statistics' })
           .setTimestamp();
 
         await AdvancedCommandLogger.logCommand(interaction, 'stats', {

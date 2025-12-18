@@ -228,7 +228,7 @@ export class AdvancedCommandLogger {
 
     embed
       .setFooter({
-        text: `SellAuth Bot | Registro de Comandos | v1.0`
+        text: `SellHub Bot | Registro de Comandos | v1.0`
       })
       .setTimestamp();
 

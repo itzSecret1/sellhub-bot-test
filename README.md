@@ -1,6 +1,6 @@
-# SellAuth Discord Bot
+# SellHub Discord Bot
 
-**A professional Discord bot for managing SellAuth e-commerce shops with real-time product variants, accurate stock management, and role-based access control.**
+**A professional Discord bot for managing SellHub e-commerce shops with real-time product variants, accurate stock management, and role-based access control.**
 
 ---
 
@@ -22,7 +22,7 @@
 ### Prerequisites
 - Node.js 18+ and npm
 - Discord bot token
-- SellAuth API credentials
+- SellHub API credentials
 
 ### Installation
 
@@ -51,20 +51,20 @@ For 24/7 hosting, deploy to Railway in 3 steps:
 ### 1. Connect GitHub
 - Visit [railway.app](https://railway.app)
 - Click **New Project** → **Deploy from GitHub**
-- Select your `sell-auth-bot-test` repository
+- Select your repository
 
 ### 2. Set Environment Variables
 After initial build failure, add these 8 variables in Railway Settings:
 
 ```
 BOT_TOKEN=<your_discord_bot_token>
-BOT_GUILD_ID=1440385098724675818
-BOT_ADMIN_ROLE_ID=1440390894430982224
-BOT_STAFF_ROLE_ID=1440390892900061336
-BOT_CUSTOMER_ROLE_ID=1440390895462645771
+BOT_GUILD_ID=<your_discord_guild_id>
+BOT_ADMIN_ROLE_ID=<your_admin_role_id>
+BOT_STAFF_ROLE_ID=<your_staff_role_id>
+BOT_CUSTOMER_ROLE_ID=<your_customer_role_id>
 BOT_USER_ID_WHITELIST=
-SA_API_KEY=<your_sellauth_api_key>
-SA_SHOP_ID=112723
+SH_API_KEY=<your_sellhub_api_key>
+SH_SHOP_ID=<your_sellhub_shop_id>
 ```
 
 ### 3. Redeploy
@@ -96,7 +96,7 @@ Snake Support ready!
 | `/unreplace` | Staff+ | Restore previously removed items |
 | `/claim` | All | Claim invoice and get customer role |
 | `/invoice-view` | Staff+ | View invoice details |
-| `/sync-variants` | Admin | Manually sync product variants from SellAuth |
+| `/sync-variants` | Admin | Manually sync product variants from SellHub |
 | `/stats` | Admin | View shop statistics |
 
 ---
@@ -115,13 +115,13 @@ Snake Support ready!
 - **Three-tier system**: Admin > Staff > Customer
 
 ### Stock Management
-- **Real-time sync**: Fetches from SellAuth `/deliverables` endpoint
+- **Real-time sync**: Fetches from SellHub `/deliverables` endpoint
 - **Batch processing**: 5 concurrent API calls (prevents overload)
 - **Background sync**: Runs every 30 seconds without blocking commands
 - **Instant autocomplete**: Uses cached data for instant suggestions
 
 ### API Communication
-- **axios**: HTTP client for SellAuth REST API
+- **axios**: HTTP client for SellHub REST API
 - **Centralized**: Single `Api` class handles all requests
 - **Error handling**: Graceful degradation on API failures
 - **Retry logic**: Automatic recovery on network issues
@@ -175,7 +175,7 @@ npm run format          # Format code with prettier
 - Uses cached data for instant results after initial load
 
 **Stock count incorrect:**
-- Bot fetches real stock from SellAuth deliverables
+- Bot fetches real stock from SellHub deliverables
 - Updates every 30 seconds automatically
 - Use `/sync-variants` to force immediate sync
 

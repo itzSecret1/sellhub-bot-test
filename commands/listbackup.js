@@ -35,7 +35,7 @@ export default {
           .setColor(0x0099ff)
           .setTitle('📋 Backups Disponibles')
           .setDescription(`Total: ${backups.length} backup(s)`)
-          .setFooter({ text: 'SellAuth Bot | Server Management' })
+          .setFooter({ text: 'SellHub Bot | Server Management' })
           .setTimestamp();
 
         // Add backup fields (max 25 per embed)

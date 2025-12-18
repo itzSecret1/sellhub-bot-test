@@ -75,7 +75,7 @@ export class CommandLogger {
         });
       }
 
-      embed.setFooter({ text: `SellAuth Bot | Command Log` })
+      embed.setFooter({ text: `SellHub Bot | Command Log` })
         .setTimestamp();
 
       // Send to LOG_CHANNEL_ID if configured, otherwise reply to user
