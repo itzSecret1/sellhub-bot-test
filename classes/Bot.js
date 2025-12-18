@@ -45,17 +45,26 @@ export class Bot {
     this.client.on('ready', async () => {
       console.log(`${this.client.user.username} ready!`);
       // Wait a bit to ensure client is fully ready
-      await new Promise(r => setTimeout(r, 1000));
+      await new Promise(r => setTimeout(r, 2000));
       
-      // DISABLED: Auto-registration can hit Discord rate limits
-      // Use the register-commands.js script manually when needed
-      // if (!this.isRegisteringCommands) {
-      //   await this.registerSlashCommands();
-      // }
-      
-      console.log(`[BOT] ⚠️  Auto-command registration disabled to avoid rate limits`);
-      console.log(`[BOT] 💡 To register commands, run: node register-commands.js`);
-      console.log(`[BOT] 📝 Note: Only registered commands will appear in Discord`);
+      // Check registered commands and register if needed (only once)
+      try {
+        const guild = await this.client.guilds.fetch(config.BOT_GUILD_ID);
+        const registered = await guild.commands.fetch();
+        const expectedCount = 34; // Update this if you add/remove commands
+        
+        console.log(`[BOT] 📊 Currently registered: ${registered.size} commands`);
+        
+        if (registered.size < expectedCount / 2) {
+          console.log(`[BOT] ⚠️  Only ${registered.size} commands registered (expected ~${expectedCount})`);
+          console.log(`[BOT] 💡 Use /register-commands (if available) or run: node register-commands.js`);
+          console.log(`[BOT] 📝 Note: Commands will work but may not appear in Discord autocomplete`);
+        } else {
+          console.log(`[BOT] ✅ Commands registered: ${registered.size}`);
+        }
+      } catch (e) {
+        console.warn(`[BOT] ⚠️  Could not check registered commands:`, e.message);
+      }
       
       this.initializeAutomatedSystems();
     });
