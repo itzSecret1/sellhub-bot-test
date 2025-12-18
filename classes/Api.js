@@ -14,16 +14,16 @@ export class Api {
     // Based on SellHub docs and dashboard URL structure
     // Dashboard: https://dash.sellhub.cx/{shopId}/products/...
     // Try multiple endpoint structures and base URLs
-    // First, try different base URLs (prioritize dash.sellhub.cx based on docs)
+    // First, try different base URLs - maybe API is not under /api/
     const baseUrls = [
-      `https://snakessh.sellhub.cx/api/${this.shopId}/`, // Shop-specific API (most likely)
-      `https://dash.sellhub.cx/api/${this.shopId}/`, // Shop-specific API on dash
-      `https://dash.sellhub.cx/api/sellhub/`, // From official docs
-      `https://dash.sellhub.cx/api/`, // From official docs
-      `https://snakessh.sellhub.cx/api/`,
-      `https://api.sellhub.cx/`,
-      `https://api.sellhub.cx/v1/`,
-      `https://snakessh.sellhub.cx/`
+      `https://snakessh.sellhub.cx/`, // Direct domain (no /api/)
+      `https://snakessh.sellhub.cx/api/`, // Standard API path
+      `https://dash.sellhub.cx/`, // Direct dash domain
+      `https://dash.sellhub.cx/api/`, // Dash with API
+      `https://api.sellhub.cx/`, // API subdomain
+      `https://api.sellhub.cx/v1/`, // API subdomain with v1
+      `https://snakessh.sellhub.cx/api/${this.shopId}/`, // Shop-specific API
+      `https://dash.sellhub.cx/api/${this.shopId}/` // Shop-specific API on dash
     ];
     
     // Extract resource type from endpoint (products, invoices, etc.)
@@ -32,28 +32,31 @@ export class Api {
                         endpoint.includes('deliverables') ? 'deliverables' : '';
     
     // Then try different endpoint structures (prioritize simple resource names)
+    // Remove duplicates and invalid combinations
     const endpointVariations = [
-      resourceType, // Just products (if shop ID is in base URL)
+      `${this.shopId}/${resourceType}`, // shopId/products (matches dashboard structure)
+      resourceType, // Just products
       `shops/${this.shopId}/${resourceType}`, // shops/{shopId}/products
+      `api/${this.shopId}/${resourceType}`, // api/shopId/products
+      `api/shops/${this.shopId}/${resourceType}`, // api/shops/{shopId}/products
       `sellhub/shops/${this.shopId}/${resourceType}`, // From docs: sellhub/shops/{shopId}/products
       `sellhub/${resourceType}`, // sellhub/products
-      endpoint, // Original: shops/{shopId}/products
-      `sellhub/${endpoint}`, // sellhub/shops/{shopId}/products
-      `${this.shopId}/${resourceType}`, // shopId/products
-      `v1/${resourceType}`, // v1/products
+      `v1/${this.shopId}/${resourceType}`, // v1/shopId/products
       `v1/shops/${this.shopId}/${resourceType}`, // v1/shops/{shopId}/products
-      `api/sellhub/shops/${this.shopId}/${resourceType}`, // api/sellhub/shops/{shopId}/products
-      `api/v1/shops/${this.shopId}/${resourceType}` // api/v1/shops/{shopId}/products
+      endpoint // Original: shops/{shopId}/products
     ];
+    
+    // Remove duplicates
+    const uniqueVariations = [...new Set(endpointVariations)];
 
     let lastError = null;
     let attemptCount = 0;
-    const maxAttempts = baseUrls.length * endpointVariations.length;
+    const maxAttempts = baseUrls.length * uniqueVariations.length;
     
     // Try each base URL with each endpoint variation
     for (const baseUrl of baseUrls) {
-      for (let i = 0; i < endpointVariations.length; i++) {
-        const endpointVar = endpointVariations[i];
+      for (let i = 0; i < uniqueVariations.length; i++) {
+        const endpointVar = uniqueVariations[i];
         attemptCount++;
         
         // Skip if endpoint doesn't make sense for this variation
