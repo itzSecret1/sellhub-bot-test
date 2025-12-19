@@ -329,39 +329,66 @@ export default {
       let stockErrors = 0;
       
       // Function to try multiple endpoint variations
-      // IMPORTANT: Based on API logs, deliverables works WITHOUT shop ID, fails WITH shop ID
+      // IMPORTANT: Based on API logs, some variants have stock, others don't (404 is normal for empty stock)
       async function fetchStockWithVariations(api, productId, variantId) {
         const endpointVariations = [
-          // Try WITHOUT shop ID first (these work based on logs)
+          // Try WITHOUT shop ID first - these are the correct endpoints
           `products/${productId}/deliverables/${variantId}`,
           `products/${productId}/variants/${variantId}/deliverables`,
+          `variants/${variantId}/deliverables`,
+          `variants/${variantId}/deliverables?product_id=${productId}`,
           `deliverables/${variantId}?product_id=${productId}`,
-          // Only try with shop ID as last resort (these fail with 404)
-          // Note: Removed shop ID variations as they return 404 HTML pages
         ].filter(e => e.trim() !== ''); // Remove empty strings
+        
+        let lastError = null;
+        let lastResponse = null;
         
         for (const endpoint of endpointVariations) {
           try {
             const deliverablesData = await api.get(endpoint);
-            if (deliverablesData) {
+            lastResponse = deliverablesData;
+            
+            // If we got a response (even if empty), parse it
+            if (deliverablesData !== null && deliverablesData !== undefined) {
               const items = parseDeliverables(deliverablesData);
-              if (items.length > 0 || typeof deliverablesData === 'string') {
-                return items;
-              }
+              // Return items even if empty (0 stock is valid)
+              return items;
             }
           } catch (error) {
-            // If 404, try next variation
-            if (error.status === 404 || (error.response && error.response.status === 404)) {
+            const status = error.status || error.response?.status;
+            
+            // If 404, this variant likely has no stock (normal case)
+            if (status === 404) {
+              lastError = error;
+              // Continue to try other variations, but 404 might mean no stock
               continue;
             }
+            
             // If 429, throw to handle retry
-            if (error.status === 429 || (error.response && error.response.status === 429)) {
+            if (status === 429) {
               throw error;
             }
+            
             // Other errors, try next variation
+            lastError = error;
             continue;
           }
         }
+        
+        // If all variations returned 404, this variant likely has no stock
+        // Return empty array (0 stock) instead of throwing error
+        if (lastError && (lastError.status === 404 || lastError.response?.status === 404)) {
+          console.log(`[SYNC] ⚠️  Variant ${variantId} returned 404 - likely has no stock (this is normal)`);
+          return []; // Return empty array = 0 stock
+        }
+        
+        // If we got a response but couldn't parse it, return empty
+        if (lastResponse !== null && lastResponse !== undefined) {
+          return parseDeliverables(lastResponse);
+        }
+        
+        // If all variations failed with non-404 errors, return empty (0 stock)
+        return [];
         
         // If all variations failed, try getting individual product to see if stock is there
         try {

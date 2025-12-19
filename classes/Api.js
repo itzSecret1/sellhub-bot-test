@@ -168,15 +168,33 @@ export class Api {
     
     // For deliverables, prioritize endpoints WITHOUT shop ID
     if (resourceType === 'deliverables' || cleanEndpoint.includes('deliverables')) {
+      // Extract variant ID and product ID from endpoint
+      const deliverablesMatch = cleanEndpoint.match(/deliverables\/([^/?]+)/);
+      const variantId = deliverablesMatch ? deliverablesMatch[1] : null;
+      const productMatch = cleanEndpoint.match(/products\/([^/]+)/);
+      const productId = productMatch ? productMatch[1] : null;
+      
       endpointVariations.push(
         resourcePath, // products/{id}/deliverables/{variantId} (NO shop ID)
         cleanEndpoint.replace(/^shops\/[^/]+\//, ''), // Remove shop ID if present
-        `deliverables/${cleanEndpoint.split('/deliverables/')[1] || cleanEndpoint.split('deliverables/')[1]}`, // Just deliverables/{variantId}
       );
-      // Only add shop ID version as last resort
-      if (shopId && !resourcePath.includes(`shops/${shopId}`)) {
-        endpointVariations.push(`shops/${shopId}/${resourcePath}`);
+      
+      // Add more variations if we have IDs
+      if (variantId && productId) {
+        endpointVariations.push(
+          `products/${productId}/variants/${variantId}/deliverables`,
+          `variants/${variantId}/deliverables`,
+          `variants/${variantId}/deliverables?product_id=${productId}`,
+        );
       }
+      
+      if (variantId) {
+        endpointVariations.push(
+          `deliverables/${variantId}${productId ? `?product_id=${productId}` : ''}`,
+        );
+      }
+      
+      // Don't add shop ID versions - they return 404 HTML pages
       endpointVariations.push(endpoint); // Original as final fallback
     } else {
       // For other endpoints (products, invoices), try without shop ID first
