@@ -64,8 +64,10 @@ BOT_STAFF_ROLE_ID=<your_staff_role_id>
 BOT_CUSTOMER_ROLE_ID=<your_customer_role_id>
 BOT_USER_ID_WHITELIST=
 SH_API_KEY=<your_sellhub_api_key>
-SH_SHOP_ID=<your_sellhub_shop_id>
+SH_SHOP_ID=<optional_sellhub_shop_id>
 ```
+
+**⚠️ IMPORTANT:** Only `SH_API_KEY` is required. `SH_SHOP_ID` is optional and will be auto-detected from the API if not provided.
 
 ### 3. Redeploy
 Click **Redeploy** and wait 2-3 minutes. Check logs for:

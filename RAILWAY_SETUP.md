@@ -26,16 +26,18 @@ The first deployment will fail (no env vars yet). Configure them now:
 3. Go to **Settings** → **Environment**
 4. Add these 8 variables exactly:
 
-| Variable | Value |
-|----------|-------|
-| `BOT_TOKEN` | Your Discord bot token |
-| `BOT_GUILD_ID` | `1440385098724675818` |
-| `BOT_ADMIN_ROLE_ID` | `1440390894430982224` |
-| `BOT_STAFF_ROLE_ID` | `1440390892900061336` |
-| `BOT_CUSTOMER_ROLE_ID` | `1440390895462645771` |
-| `BOT_USER_ID_WHITELIST` | *(leave empty)* |
-| `SH_API_KEY` | Your SellHub API key |
-| `SH_SHOP_ID` | Your SellHub shop ID |
+| Variable | Value | Required |
+|----------|-------|----------|
+| `BOT_TOKEN` | Your Discord bot token | ✅ Yes |
+| `BOT_GUILD_ID` | `1440385098724675818` | ✅ Yes |
+| `BOT_ADMIN_ROLE_ID` | `1440390894430982224` | ✅ Yes |
+| `BOT_STAFF_ROLE_ID` | `1440390892900061336` | ✅ Yes |
+| `BOT_CUSTOMER_ROLE_ID` | `1440390895462645771` | ✅ Yes |
+| `BOT_USER_ID_WHITELIST` | *(leave empty)* | ❌ No |
+| `SH_API_KEY` | Your SellHub API key | ✅ Yes |
+| `SH_SHOP_ID` | Your SellHub shop ID | ❌ No (auto-detected) |
+
+**⚠️ IMPORTANT:** Only `SH_API_KEY` is required. `SH_SHOP_ID` is optional and will be automatically detected from the API if not provided.
 
 **⚠️ Important:**
 - **No quotes** around values
