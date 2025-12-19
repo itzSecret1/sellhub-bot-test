@@ -7,14 +7,12 @@ import { Bot } from './classes/Bot.js';
 import { Api } from './classes/Api.js';
 import { config } from './utils/config.js';
 
-// Validate required environment variables (support both SH_* and SA_* for backward compatibility)
-const hasApiKey = process.env.SH_API_KEY || process.env.SA_API_KEY;
-const hasShopId = process.env.SH_SHOP_ID || process.env.SA_SHOP_ID;
+// Validate required environment variables (SellHub ONLY - no SellAuth support)
 const missingVars = [];
 if (!process.env.BOT_TOKEN) missingVars.push('BOT_TOKEN');
 if (!process.env.BOT_GUILD_ID) missingVars.push('BOT_GUILD_ID');
-if (!hasApiKey) missingVars.push('SH_API_KEY or SA_API_KEY');
-if (!hasShopId) missingVars.push('SH_SHOP_ID or SA_SHOP_ID');
+if (!process.env.SH_API_KEY) missingVars.push('SH_API_KEY');
+if (!process.env.SH_SHOP_ID) missingVars.push('SH_SHOP_ID');
 
 if (missingVars.length > 0) {
   console.error(

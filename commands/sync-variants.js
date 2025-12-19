@@ -18,9 +18,27 @@ export default {
 
   async execute(interaction, api) {
     // CRITICAL: Verify we're using SellHub API, not SellAuth
-    if (api.baseUrl && api.baseUrl.includes('sellauth')) {
+    if (!api.baseUrl || api.baseUrl.includes('sellauth')) {
       await interaction.reply({
-        content: '❌ ERROR: El bot está configurado para usar SellAuth en lugar de SellHub. Verifica las variables de entorno.',
+        content: '❌ ERROR: El bot está configurado para usar SellAuth en lugar de SellHub. Verifica las variables de entorno SH_API_KEY y SH_SHOP_ID.',
+        ephemeral: true
+      });
+      return;
+    }
+    
+    // Verify base URL is correct SellHub URL
+    if (!api.baseUrl.includes('sellhub.cx')) {
+      await interaction.reply({
+        content: `❌ ERROR: Base URL incorrecta. Esperado: dash.sellhub.cx, Actual: ${api.baseUrl}`,
+        ephemeral: true
+      });
+      return;
+    }
+    
+    // Verify we have required SellHub credentials
+    if (!api.apiKey || !api.shopId) {
+      await interaction.reply({
+        content: '❌ ERROR: Faltan credenciales de SellHub. Verifica SH_API_KEY y SH_SHOP_ID en variables de entorno.',
         ephemeral: true
       });
       return;

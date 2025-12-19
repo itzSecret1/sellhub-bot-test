@@ -1,8 +1,8 @@
 import 'dotenv/config';
 import axios from 'axios';
 
-const apiKey = process.env.SH_API_KEY || process.env.SA_API_KEY || '';
-const shopId = process.env.SH_SHOP_ID || process.env.SA_SHOP_ID || '';
+const apiKey = process.env.SH_API_KEY || '';
+const shopId = process.env.SH_SHOP_ID || '';
 
 console.log('🔍 Testing SellHub API directly...\n');
 console.log(`Shop ID: ${shopId}`);

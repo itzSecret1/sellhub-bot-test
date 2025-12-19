@@ -3,11 +3,23 @@ import { config } from '../utils/config.js';
 
 export class Api {
   constructor() {
-    // Base URL according to official docs: https://dash.sellhub.cx/api/sellhub/
+    // Base URL according to official SellHub docs: https://dash.sellhub.cx/api/sellhub/
+    // IMPORTANT: This bot ONLY supports SellHub, NOT SellAuth
     this.baseUrl = 'https://dash.sellhub.cx/api/sellhub/';
     this.apiKey = config.SH_API_KEY;
     this.shopId = config.SH_SHOP_ID;
     this.endpointPrefix = ''; // Will be determined dynamically
+    
+    // Validate configuration on initialization
+    if (!this.apiKey) {
+      throw new Error('SH_API_KEY is required. This bot only supports SellHub, not SellAuth.');
+    }
+    if (!this.shopId) {
+      throw new Error('SH_SHOP_ID is required. This bot only supports SellHub, not SellAuth.');
+    }
+    if (this.baseUrl.includes('sellauth')) {
+      throw new Error('Invalid base URL: SellAuth is not supported. Use SellHub (dash.sellhub.cx)');
+    }
   }
 
   async get(endpoint, params = {}) {

@@ -7,9 +7,9 @@ let config = {
   BOT_CUSTOMER_ROLE_ID: process.env.BOT_CUSTOMER_ROLE_ID || '',
   BOT_STAFF_ROLE_ID: process.env.BOT_STAFF_ROLE_ID || '',
   BOT_ADMIN_ROLE_ID: process.env.BOT_ADMIN_ROLE_ID || '',
-  // Support both new (SH_*) and old (SA_*) variable names for backward compatibility
-  SH_API_KEY: process.env.SH_API_KEY || process.env.SA_API_KEY || '',
-  SH_SHOP_ID: process.env.SH_SHOP_ID || process.env.SA_SHOP_ID || '',
+  // SellHub API configuration (REQUIRED - no fallback to SellAuth)
+  SH_API_KEY: process.env.SH_API_KEY || '',
+  SH_SHOP_ID: process.env.SH_SHOP_ID || '',
   LOG_CHANNEL_ID: process.env.LOG_CHANNEL_ID || ''
 };
 
