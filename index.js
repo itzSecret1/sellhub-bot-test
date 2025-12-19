@@ -10,17 +10,27 @@ import { config } from './utils/config.js';
 // Validate required environment variables (SellHub ONLY - no SellAuth support)
 // IMPORTANT: Only SH_API_KEY is required. SH_SHOP_ID is optional and will be auto-detected.
 const missingVars = [];
+
+// Check both process.env and config (in case of loading order issues)
 const envVars = {
-  BOT_TOKEN: process.env.BOT_TOKEN,
-  BOT_GUILD_ID: process.env.BOT_GUILD_ID,
-  SH_API_KEY: process.env.SH_API_KEY,
-  SH_SHOP_ID: process.env.SH_SHOP_ID // Optional
+  BOT_TOKEN: process.env.BOT_TOKEN || config.BOT_TOKEN,
+  BOT_GUILD_ID: process.env.BOT_GUILD_ID || config.BOT_GUILD_ID,
+  SH_API_KEY: process.env.SH_API_KEY || config.SH_API_KEY,
+  SH_SHOP_ID: process.env.SH_SHOP_ID || config.SH_SHOP_ID // Optional
+};
+
+// Trim whitespace and check if empty
+const checkVar = (value, name) => {
+  if (!value) return false;
+  const trimmed = String(value).trim();
+  if (trimmed === '' || trimmed === 'undefined' || trimmed === 'null') return false;
+  return true;
 };
 
 // Check each required variable
-if (!envVars.BOT_TOKEN) missingVars.push('BOT_TOKEN');
-if (!envVars.BOT_GUILD_ID) missingVars.push('BOT_GUILD_ID');
-if (!envVars.SH_API_KEY) missingVars.push('SH_API_KEY');
+if (!checkVar(envVars.BOT_TOKEN, 'BOT_TOKEN')) missingVars.push('BOT_TOKEN');
+if (!checkVar(envVars.BOT_GUILD_ID, 'BOT_GUILD_ID')) missingVars.push('BOT_GUILD_ID');
+if (!checkVar(envVars.SH_API_KEY, 'SH_API_KEY')) missingVars.push('SH_API_KEY');
 // SH_SHOP_ID is optional - will be obtained from API if not provided
 
 if (missingVars.length > 0) {
