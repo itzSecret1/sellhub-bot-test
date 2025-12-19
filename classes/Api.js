@@ -163,18 +163,36 @@ export class Api {
     }
     
     // Build endpoint variations - try WITHOUT shop ID first (SellHub API key contains shop info)
-    const endpointVariations = [
-      resourcePath, // products, products/{id}, products/{id}/deliverables/{variantId}
-      resourceType, // Just 'products' or 'invoices'
-      cleanEndpoint, // Clean endpoint without shop ID
-    ];
+    // IMPORTANT: Based on logs, /products works without shop ID, but /deliverables fails WITH shop ID
+    const endpointVariations = [];
     
-    // If shop ID is available, also try with shop ID (for backwards compatibility)
-    if (shopId) {
+    // For deliverables, prioritize endpoints WITHOUT shop ID
+    if (resourceType === 'deliverables' || cleanEndpoint.includes('deliverables')) {
       endpointVariations.push(
-        `shops/${shopId}/${resourcePath}`, // shops/{shopId}/products
-        endpoint // Original endpoint as fallback
+        resourcePath, // products/{id}/deliverables/{variantId} (NO shop ID)
+        cleanEndpoint.replace(/^shops\/[^/]+\//, ''), // Remove shop ID if present
+        `deliverables/${cleanEndpoint.split('/deliverables/')[1] || cleanEndpoint.split('deliverables/')[1]}`, // Just deliverables/{variantId}
       );
+      // Only add shop ID version as last resort
+      if (shopId && !resourcePath.includes(`shops/${shopId}`)) {
+        endpointVariations.push(`shops/${shopId}/${resourcePath}`);
+      }
+      endpointVariations.push(endpoint); // Original as final fallback
+    } else {
+      // For other endpoints (products, invoices), try without shop ID first
+      endpointVariations.push(
+        resourcePath, // products, products/{id}
+        resourceType, // Just 'products' or 'invoices'
+        cleanEndpoint, // Clean endpoint without shop ID
+      );
+      
+      // If shop ID is available, also try with shop ID (for backwards compatibility)
+      if (shopId) {
+        endpointVariations.push(
+          `shops/${shopId}/${resourcePath}`, // shops/{shopId}/products
+          endpoint // Original endpoint as fallback
+        );
+      }
     }
     
     // Remove duplicates and empty strings

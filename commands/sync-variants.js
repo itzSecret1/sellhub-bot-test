@@ -329,16 +329,15 @@ export default {
       let stockErrors = 0;
       
       // Function to try multiple endpoint variations
+      // IMPORTANT: Based on API logs, deliverables works WITHOUT shop ID, fails WITH shop ID
       async function fetchStockWithVariations(api, productId, variantId) {
-        const shopId = await api.getShopId();
-        const shopPrefix = shopId ? `shops/${shopId}/` : '';
         const endpointVariations = [
-          `products/${productId}/deliverables/${variantId}`, // Try without shop ID first
-          `${shopPrefix}products/${productId}/deliverables/${variantId}`, // With shop ID if available
+          // Try WITHOUT shop ID first (these work based on logs)
+          `products/${productId}/deliverables/${variantId}`,
           `products/${productId}/variants/${variantId}/deliverables`,
-          `${shopPrefix}products/${productId}/variants/${variantId}/deliverables`,
           `deliverables/${variantId}?product_id=${productId}`,
-          `${shopPrefix}deliverables/${variantId}?product_id=${productId}`
+          // Only try with shop ID as last resort (these fail with 404)
+          // Note: Removed shop ID variations as they return 404 HTML pages
         ].filter(e => e.trim() !== ''); // Remove empty strings
         
         for (const endpoint of endpointVariations) {
