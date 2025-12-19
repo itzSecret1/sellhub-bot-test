@@ -35,13 +35,26 @@ export default {
       return;
     }
     
-    // Verify we have required SellHub credentials
-    if (!api.apiKey || !api.shopId) {
+    // Verify we have required SellHub credentials (only API key is required)
+    if (!api.apiKey) {
       await interaction.reply({
-        content: '❌ ERROR: Faltan credenciales de SellHub. Verifica SH_API_KEY y SH_SHOP_ID en variables de entorno.',
+        content: '❌ ERROR: Falta SH_API_KEY en variables de entorno. Solo se requiere la API Key de SellHub.',
         ephemeral: true
       });
       return;
+    }
+    
+    // Try to detect shop ID if not provided (optional)
+    try {
+      const shopId = await api.getShopId();
+      if (shopId) {
+        console.log(`[SYNC] ✅ Shop ID: ${shopId.substring(0, 20)}...`);
+      } else {
+        console.log(`[SYNC] ⚠️  Shop ID no detectado - usando endpoints sin shop ID`);
+      }
+    } catch (error) {
+      console.log(`[SYNC] ⚠️  No se pudo detectar shop ID: ${error.message}`);
+      console.log(`[SYNC] Continuando sin shop ID...`);
     }
     
     // CRITICAL: Check and clean old SellAuth data from cache
@@ -71,22 +84,31 @@ export default {
             console.error(`[SYNC] Error deleting old cache:`, e.message);
           }
         } else {
-          // Verify shop ID matches current configuration
-          const productIds = Object.values(oldData).map(p => p.productId?.toString() || '');
-          const hasMatchingShopId = productIds.some(id => id.startsWith(api.shopId?.substring(0, 8) || ''));
-          
-          if (!hasMatchingShopId && api.shopId) {
-            console.log(`[SYNC] ⚠️  Cache data doesn't match current shop ID (${api.shopId})`);
-            console.log(`[SYNC] 🗑️  Deleting cache to force fresh sync...`);
-            try {
-              if (existsSync(variantsDataPath)) {
-                unlinkSync(variantsDataPath);
-                console.log(`[SYNC] ✅ Deleted mismatched cache file`);
+          // Verify shop ID matches current configuration (if shop ID is available)
+          try {
+            const shopId = await api.getShopId();
+            if (shopId) {
+              const productIds = Object.values(oldData).map(p => p.productId?.toString() || '');
+              const hasMatchingShopId = productIds.some(id => id.startsWith(shopId.substring(0, 8) || ''));
+              
+              if (!hasMatchingShopId) {
+                console.log(`[SYNC] ⚠️  Cache data doesn't match current shop ID (${shopId})`);
+                console.log(`[SYNC] 🗑️  Deleting cache to force fresh sync...`);
+                try {
+                  if (existsSync(variantsDataPath)) {
+                    unlinkSync(variantsDataPath);
+                    console.log(`[SYNC] ✅ Deleted mismatched cache file`);
+                  }
+                } catch (e) {
+                  console.error(`[SYNC] Error deleting cache:`, e.message);
+                }
+              } else {
+                console.log(`[SYNC] ✅ Cache data looks valid (SellHub UUIDs detected)`);
               }
-            } catch (e) {
-              console.error(`[SYNC] Error deleting cache:`, e.message);
+            } else {
+              console.log(`[SYNC] ✅ Cache data looks valid (SellHub UUIDs detected)`);
             }
-          } else {
+          } catch (e) {
             console.log(`[SYNC] ✅ Cache data looks valid (SellHub UUIDs detected)`);
           }
         }
@@ -138,10 +160,13 @@ export default {
       while (hasMoreProducts && page <= 50) {
         try {
           // Fetch products from SellHub API
+          // Try without shop ID first (API key contains shop info)
+          const shopId = await api.getShopId();
+          const productsEndpoint = shopId ? `shops/${shopId}/products` : 'products';
           console.log(`[SYNC] 📡 Fetching products page ${page}...`);
-          console.log(`[SYNC] 📡 Endpoint: shops/${api.shopId}/products`);
+          console.log(`[SYNC] 📡 Endpoint: ${productsEndpoint}`);
           console.log(`[SYNC] 📡 Params: limit=100, page=${page}`);
-          const products = await api.get(`shops/${api.shopId}/products`, { limit: 100, page: page });
+          const products = await api.get(productsEndpoint, { limit: 100, page: page });
           
           console.log(`[SYNC] 📦 Raw API response type: ${Array.isArray(products) ? 'array' : typeof products}`);
           console.log(`[SYNC] 📦 Raw API response keys: ${products ? Object.keys(products).join(', ') : 'null'}`);
@@ -305,14 +330,16 @@ export default {
       
       // Function to try multiple endpoint variations
       async function fetchStockWithVariations(api, productId, variantId) {
+        const shopId = await api.getShopId();
+        const shopPrefix = shopId ? `shops/${shopId}/` : '';
         const endpointVariations = [
-          `shops/${api.shopId}/products/${productId}/deliverables/${variantId}`,
-          `products/${productId}/deliverables/${variantId}`,
-          `shops/${api.shopId}/products/${productId}/variants/${variantId}/deliverables`,
+          `products/${productId}/deliverables/${variantId}`, // Try without shop ID first
+          `${shopPrefix}products/${productId}/deliverables/${variantId}`, // With shop ID if available
           `products/${productId}/variants/${variantId}/deliverables`,
+          `${shopPrefix}products/${productId}/variants/${variantId}/deliverables`,
           `deliverables/${variantId}?product_id=${productId}`,
-          `shops/${api.shopId}/deliverables/${variantId}?product_id=${productId}`
-        ];
+          `${shopPrefix}deliverables/${variantId}?product_id=${productId}`
+        ].filter(e => e.trim() !== ''); // Remove empty strings
         
         for (const endpoint of endpointVariations) {
           try {
@@ -339,7 +366,9 @@ export default {
         
         // If all variations failed, try getting individual product to see if stock is there
         try {
-          const productData = await api.get(`shops/${api.shopId}/products/${productId}`);
+          const shopId = await api.getShopId();
+          const productEndpoint = shopId ? `shops/${shopId}/products/${productId}` : `products/${productId}`;
+          const productData = await api.get(productEndpoint);
           if (productData) {
             // Check if product has variants with stock info
             const product = Array.isArray(productData) ? productData[0] : 
@@ -440,7 +469,10 @@ export default {
             await new Promise(resolve => setTimeout(resolve, 3000)); // Wait 3s before retry
             
             // Try the endpoint structure that works for PUT operations
-            const altEndpoint = `shops/${api.shopId}/products/${variantInfo.productId}/deliverables/${variantInfo.variantId}`;
+            const shopId = await api.getShopId();
+            const altEndpoint = shopId 
+              ? `shops/${shopId}/products/${variantInfo.productId}/deliverables/${variantInfo.variantId}`
+              : `products/${variantInfo.productId}/deliverables/${variantInfo.variantId}`;
             const altData = await api.get(altEndpoint);
             const altItems = parseDeliverables(altData);
             const altStock = altItems.length;
@@ -503,7 +535,9 @@ export default {
 
         while (hasMoreInvoices && invPage <= 50) {
           try {
-            const invoices = await api.get(`shops/${api.shopId}/invoices`, { limit: 250, page: invPage });
+            const shopId = await api.getShopId();
+            const invoicesEndpoint = shopId ? `shops/${shopId}/invoices` : 'invoices';
+            const invoices = await api.get(invoicesEndpoint, { limit: 250, page: invPage });
             
             // Parse SellHub API response structure: { data: { invoices: [...] } } or { data: [...] } or [...]
             let pageInvoices = [];

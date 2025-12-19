@@ -8,11 +8,12 @@ import { Api } from './classes/Api.js';
 import { config } from './utils/config.js';
 
 // Validate required environment variables (SellHub ONLY - no SellAuth support)
+// IMPORTANT: Only SH_API_KEY is required. SH_SHOP_ID is optional and will be auto-detected.
 const missingVars = [];
 if (!process.env.BOT_TOKEN) missingVars.push('BOT_TOKEN');
 if (!process.env.BOT_GUILD_ID) missingVars.push('BOT_GUILD_ID');
 if (!process.env.SH_API_KEY) missingVars.push('SH_API_KEY');
-if (!process.env.SH_SHOP_ID) missingVars.push('SH_SHOP_ID');
+// SH_SHOP_ID is optional - will be obtained from API if not provided
 
 if (missingVars.length > 0) {
   console.error(

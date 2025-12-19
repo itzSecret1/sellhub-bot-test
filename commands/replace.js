@@ -17,7 +17,11 @@ async function getVariantStock(api, productId, variantId) {
   }
 
   try {
-    const deliverablesData = await api.get(`shops/${api.shopId}/products/${productId}/deliverables/${variantId}`);
+    const shopId = await api.getShopId();
+    const deliverablesEndpoint = shopId 
+      ? `shops/${shopId}/products/${productId}/deliverables/${variantId}`
+      : `products/${productId}/deliverables/${variantId}`;
+    const deliverablesData = await api.get(deliverablesEndpoint);
     const items = parseDeliverables(deliverablesData);
 
     console.log(`[STOCK CHECK] Product ${productId}, Variant ${variantId}: Found ${items.length} items`);
@@ -331,14 +335,19 @@ export default {
       // Update API
       let apiUpdateSuccess = false;
       try {
-        await api.put(
-          `shops/${api.shopId}/products/${productData.productId}/deliverables/overwrite/${variantData.id}`,
-          { deliverables: newDeliverablesString }
-        );
+        const shopId = await api.getShopId();
+        const overwriteEndpoint = shopId
+          ? `shops/${shopId}/products/${productData.productId}/deliverables/overwrite/${variantData.id}`
+          : `products/${productData.productId}/deliverables/overwrite/${variantData.id}`;
+        await api.put(overwriteEndpoint, { deliverables: newDeliverablesString });
         console.log(`[REPLACE] API updated for ${productData.productId}/${variantData.id}`);
         apiUpdateSuccess = true;
       } catch (putError) {
         console.error(`[REPLACE] API PUT failed: ${putError.message}`);
+        const shopId = await api.getShopId();
+        const endpoint = shopId
+          ? `shops/${shopId}/products/${productData.productId}/deliverables/overwrite/${variantData.id}`
+          : `products/${productData.productId}/deliverables/overwrite/${variantData.id}`;
         ErrorLog.log('replace', putError, {
           stage: 'API_UPDATE',
           productId: productData.productId,
@@ -346,7 +355,7 @@ export default {
           quantity,
           userId: interaction.user.id,
           userName: interaction.user.username,
-          endpoint: `shops/${api.shopId}/products/${productData.productId}/deliverables/overwrite/${variantData.id}`
+          endpoint: endpoint
         });
         await interaction.editReply({
           content: `❌ Error actualizando stock en API: ${putError.message}`

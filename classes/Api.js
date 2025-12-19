@@ -7,61 +7,175 @@ export class Api {
     // IMPORTANT: This bot ONLY supports SellHub, NOT SellAuth
     this.baseUrl = 'https://dash.sellhub.cx/api/sellhub/';
     this.apiKey = config.SH_API_KEY;
-    this.shopId = config.SH_SHOP_ID;
+    this.shopId = config.SH_SHOP_ID || null; // Optional - will be auto-detected from API
     this.endpointPrefix = ''; // Will be determined dynamically
+    this._shopIdPromise = null; // Cache for shop ID detection promise
     
     // Validate configuration on initialization
     if (!this.apiKey) {
       throw new Error('SH_API_KEY is required. This bot only supports SellHub, not SellAuth.');
     }
-    if (!this.shopId) {
-      throw new Error('SH_SHOP_ID is required. This bot only supports SellHub, not SellAuth.');
-    }
     if (this.baseUrl.includes('sellauth')) {
       throw new Error('Invalid base URL: SellAuth is not supported. Use SellHub (dash.sellhub.cx)');
     }
+    
+    // Shop ID is optional - will be detected automatically if not provided
+    if (this.shopId) {
+      console.log(`[API] Shop ID provided: ${this.shopId.substring(0, 20)}...`);
+    } else {
+      console.log(`[API] Shop ID not provided - will be auto-detected from API`);
+    }
+  }
+  
+  /**
+   * Auto-detect shop ID from API response
+   * Tries to get shop info from various endpoints
+   */
+  async detectShopId() {
+    // If already detected, return cached value
+    if (this.shopId) {
+      return this.shopId;
+    }
+    
+    // If detection is in progress, wait for it
+    if (this._shopIdPromise) {
+      return await this._shopIdPromise;
+    }
+    
+    // Start detection
+    this._shopIdPromise = this._performShopIdDetection();
+    try {
+      this.shopId = await this._shopIdPromise;
+      return this.shopId;
+    } catch (error) {
+      this._shopIdPromise = null; // Reset on error so we can retry
+      throw error;
+    }
+  }
+  
+  async _performShopIdDetection() {
+    console.log(`[API] 🔍 Auto-detecting shop ID from API...`);
+    
+    // Try to get shop info from various endpoints
+    const detectionEndpoints = [
+      'shop', // Try /shop endpoint
+      'me', // Try /me endpoint
+      'account', // Try /account endpoint
+      'products?limit=1' // Try products and extract shop_id from response
+    ];
+    
+    for (const endpoint of detectionEndpoints) {
+      try {
+        console.log(`[API] Trying to detect shop ID from: ${endpoint}`);
+        const response = await axios.get(`${this.baseUrl}${endpoint}`, {
+          headers: { 
+            'Authorization': this.apiKey,
+            'Accept': 'application/json'
+          },
+          timeout: 10000,
+          validateStatus: (status) => status < 500
+        });
+        
+        if (response.status === 200 && response.data) {
+          // Try to extract shop ID from various response structures
+          const shopId = response.data?.shop_id || 
+                        response.data?.shopId || 
+                        response.data?.id ||
+                        response.data?.data?.shop_id ||
+                        response.data?.data?.shopId ||
+                        response.data?.data?.id;
+          
+          if (shopId) {
+            console.log(`[API] ✅ Shop ID detected: ${shopId}`);
+            return shopId;
+          }
+          
+          // If products endpoint, try to get shop_id from first product
+          if (endpoint.includes('products')) {
+            const products = Array.isArray(response.data) ? response.data : 
+                           response.data?.data || 
+                           response.data?.products || [];
+            if (products.length > 0 && products[0]?.shop_id) {
+              const detectedShopId = products[0].shop_id;
+              console.log(`[API] ✅ Shop ID detected from products: ${detectedShopId}`);
+              return detectedShopId;
+            }
+          }
+        }
+      } catch (error) {
+        // Continue to next endpoint
+        continue;
+      }
+    }
+    
+    // If all detection methods fail, return null (endpoints will work without shop ID)
+    console.log(`[API] ⚠️  Could not auto-detect shop ID - will try endpoints without shop ID`);
+    return null;
+  }
+  
+  /**
+   * Get shop ID - returns provided value or auto-detects if needed
+   */
+  async getShopId() {
+    if (this.shopId) {
+      return this.shopId;
+    }
+    return await this.detectShopId();
   }
 
   async get(endpoint, params = {}) {
     // According to official docs: https://dash.sellhub.cx/api/sellhub/{recurso}
     // Examples: /api/sellhub/customers, /api/sellhub/products
     
+    // Get shop ID if needed (auto-detect if not provided)
+    const shopId = await this.getShopId();
+    
     // Extract resource type from endpoint
-    // Endpoints come as: shops/{shopId}/products -> extract 'products'
-    // Or: shops/{shopId}/products/{productId}/deliverables/{variantId} -> extract 'deliverables'
+    // Endpoints can come as: shops/{shopId}/products OR just products
     let resourceType = '';
     let resourcePath = '';
     
-    if (endpoint.includes('/deliverables/')) {
-      // For deliverables: shops/{shopId}/products/{productId}/deliverables/{variantId}
-      // Convert to: products/{productId}/deliverables/{variantId}
-      resourcePath = endpoint.replace(`shops/${this.shopId}/`, '');
+    // Remove shop ID prefix if present
+    let cleanEndpoint = endpoint;
+    if (shopId && endpoint.includes(`shops/${shopId}/`)) {
+      cleanEndpoint = endpoint.replace(`shops/${shopId}/`, '');
+    } else if (endpoint.startsWith('shops/')) {
+      // Remove any shop ID pattern
+      cleanEndpoint = endpoint.replace(/^shops\/[^/]+\//, '');
+    }
+    
+    if (cleanEndpoint.includes('/deliverables/')) {
       resourceType = 'deliverables';
-    } else if (endpoint.includes('/products/')) {
-      // For specific product: shops/{shopId}/products/{productId}
-      // Convert to: products/{productId}
-      resourcePath = endpoint.replace(`shops/${this.shopId}/`, '');
+      resourcePath = cleanEndpoint;
+    } else if (cleanEndpoint.includes('/products/')) {
       resourceType = 'products';
-    } else if (endpoint.includes('products')) {
+      resourcePath = cleanEndpoint;
+    } else if (cleanEndpoint.includes('products')) {
       resourceType = 'products';
       resourcePath = 'products';
-    } else if (endpoint.includes('invoices')) {
+    } else if (cleanEndpoint.includes('invoices')) {
       resourceType = 'invoices';
       resourcePath = 'invoices';
     } else {
-      // Fallback: try to extract resource type
-      const parts = endpoint.split('/');
-      resourceType = parts[parts.length - 1] || endpoint;
-      resourcePath = endpoint.replace(`shops/${this.shopId}/`, '');
+      const parts = cleanEndpoint.split('/');
+      resourceType = parts[parts.length - 1] || cleanEndpoint;
+      resourcePath = cleanEndpoint;
     }
     
-    // Build endpoint variations according to docs
+    // Build endpoint variations - try WITHOUT shop ID first (SellHub API key contains shop info)
     const endpointVariations = [
       resourcePath, // products, products/{id}, products/{id}/deliverables/{variantId}
       resourceType, // Just 'products' or 'invoices'
-      endpoint.replace(`shops/${this.shopId}/`, ''), // Remove shop ID prefix
-      endpoint // Original endpoint as fallback
+      cleanEndpoint, // Clean endpoint without shop ID
     ];
+    
+    // If shop ID is available, also try with shop ID (for backwards compatibility)
+    if (shopId) {
+      endpointVariations.push(
+        `shops/${shopId}/${resourcePath}`, // shops/{shopId}/products
+        endpoint // Original endpoint as fallback
+      );
+    }
     
     // Remove duplicates and empty strings
     const uniqueVariations = [...new Set(endpointVariations)].filter(e => e && e.trim() !== '');

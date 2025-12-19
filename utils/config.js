@@ -7,9 +7,10 @@ let config = {
   BOT_CUSTOMER_ROLE_ID: process.env.BOT_CUSTOMER_ROLE_ID || '',
   BOT_STAFF_ROLE_ID: process.env.BOT_STAFF_ROLE_ID || '',
   BOT_ADMIN_ROLE_ID: process.env.BOT_ADMIN_ROLE_ID || '',
-  // SellHub API configuration (REQUIRED - no fallback to SellAuth)
+  // SellHub API configuration
+  // IMPORTANT: Only API Key is required. Shop ID is optional and can be obtained from API.
   SH_API_KEY: process.env.SH_API_KEY || '',
-  SH_SHOP_ID: process.env.SH_SHOP_ID || '',
+  SH_SHOP_ID: process.env.SH_SHOP_ID || '', // Optional - will be auto-detected from API if not provided
   LOG_CHANNEL_ID: process.env.LOG_CHANNEL_ID || ''
 };
 
