@@ -166,36 +166,15 @@ export class Api {
     // IMPORTANT: Based on logs, /products works without shop ID, but /deliverables fails WITH shop ID
     const endpointVariations = [];
     
-    // For deliverables, prioritize endpoints WITHOUT shop ID
+    // For deliverables, use ONLY the correct endpoint structure
     if (resourceType === 'deliverables' || cleanEndpoint.includes('deliverables')) {
-      // Extract variant ID and product ID from endpoint
-      const deliverablesMatch = cleanEndpoint.match(/deliverables\/([^/?]+)/);
-      const variantId = deliverablesMatch ? deliverablesMatch[1] : null;
-      const productMatch = cleanEndpoint.match(/products\/([^/]+)/);
-      const productId = productMatch ? productMatch[1] : null;
-      
+      // Only use: products/{productId}/deliverables/{variantId} (NO shop ID, NO other variations)
+      // Based on logs: this is the only structure that works, 404 = no stock (normal)
       endpointVariations.push(
         resourcePath, // products/{id}/deliverables/{variantId} (NO shop ID)
         cleanEndpoint.replace(/^shops\/[^/]+\//, ''), // Remove shop ID if present
       );
-      
-      // Add more variations if we have IDs
-      if (variantId && productId) {
-        endpointVariations.push(
-          `products/${productId}/variants/${variantId}/deliverables`,
-          `variants/${variantId}/deliverables`,
-          `variants/${variantId}/deliverables?product_id=${productId}`,
-        );
-      }
-      
-      if (variantId) {
-        endpointVariations.push(
-          `deliverables/${variantId}${productId ? `?product_id=${productId}` : ''}`,
-        );
-      }
-      
-      // Don't add shop ID versions - they return 404 HTML pages
-      endpointVariations.push(endpoint); // Original as final fallback
+      // Don't try other variations - they all return 404
     } else {
       // For other endpoints (products, invoices), try without shop ID first
       endpointVariations.push(
