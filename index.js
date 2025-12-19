@@ -9,14 +9,22 @@ import { config } from './utils/config.js';
 
 // Validate required environment variables (SellHub ONLY - no SellAuth support)
 // IMPORTANT: Only SH_API_KEY is required. SH_SHOP_ID is optional and will be auto-detected.
+// Support SA_* variables for migration compatibility (with warning)
 const missingVars = [];
 
 // Check both process.env and config (in case of loading order issues)
+// Also check for SA_* variables (SellAuth) for backward compatibility
 const envVars = {
   BOT_TOKEN: process.env.BOT_TOKEN || config.BOT_TOKEN,
   BOT_GUILD_ID: process.env.BOT_GUILD_ID || config.BOT_GUILD_ID,
-  SH_API_KEY: process.env.SH_API_KEY || config.SH_API_KEY,
-  SH_SHOP_ID: process.env.SH_SHOP_ID || config.SH_SHOP_ID // Optional
+  SH_API_KEY: process.env.SH_API_KEY || process.env.SA_API_KEY || config.SH_API_KEY,
+  SH_SHOP_ID: process.env.SH_SHOP_ID || process.env.SA_SHOP_ID || config.SH_SHOP_ID // Optional
+};
+
+// Check if using deprecated SA_* variables
+const usingDeprecatedVars = {
+  apiKey: !process.env.SH_API_KEY && !!process.env.SA_API_KEY,
+  shopId: !process.env.SH_SHOP_ID && !!process.env.SA_SHOP_ID
 };
 
 // Trim whitespace and check if empty
@@ -53,6 +61,21 @@ console.log(`   BOT_TOKEN: ${envVars.BOT_TOKEN ? '✅' : '❌'}`);
 console.log(`   BOT_GUILD_ID: ${envVars.BOT_GUILD_ID ? '✅' : '❌'}`);
 console.log(`   SH_API_KEY: ${envVars.SH_API_KEY ? '✅ (' + envVars.SH_API_KEY.substring(0, 20) + '...)' : '❌'}`);
 console.log(`   SH_SHOP_ID: ${envVars.SH_SHOP_ID ? '✅ (' + envVars.SH_SHOP_ID.substring(0, 20) + '...)' : '⚠️  Optional (will be auto-detected)'}`);
+
+// Warn if using deprecated SA_* variables
+if (usingDeprecatedVars.apiKey || usingDeprecatedVars.shopId) {
+  console.log('\n⚠️  WARNING: You are using deprecated SA_* variables (SellAuth)');
+  if (usingDeprecatedVars.apiKey) {
+    console.log('   - Found SA_API_KEY instead of SH_API_KEY');
+    console.log('   - Please rename SA_API_KEY to SH_API_KEY in Railway');
+  }
+  if (usingDeprecatedVars.shopId) {
+    console.log('   - Found SA_SHOP_ID instead of SH_SHOP_ID');
+    console.log('   - Please rename SA_SHOP_ID to SH_SHOP_ID in Railway (optional)');
+  }
+  console.log('   - The bot will work, but please migrate to SH_* variables for SellHub');
+  console.log('   - Railway: Settings → Environment → Variables → Rename');
+}
 
 const client = new Client({
   intents: [
