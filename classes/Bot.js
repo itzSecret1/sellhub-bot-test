@@ -360,7 +360,7 @@ export class Bot {
         const existing = await guild.commands.fetch();
         if (existing.size > 0) {
           console.log(`[BOT] Found ${existing.size} existing commands, clearing...`);
-          for (const cmd of existing.values()) {
+        for (const cmd of existing.values()) {
             try {
               await Promise.race([
                 guild.commands.delete(cmd.id),
@@ -371,7 +371,7 @@ export class Bot {
             }
           }
           console.log(`[BOT] ✅ Cleared existing commands`);
-          await new Promise(r => setTimeout(r, 1000));
+      await new Promise(r => setTimeout(r, 1000));
         }
       } catch (e) {
         console.warn(`[BOT] ⚠️  Could not clear existing commands:`, e.message);

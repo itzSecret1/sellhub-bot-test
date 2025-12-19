@@ -210,9 +210,12 @@ export class Api {
         const fullUrl = params && Object.keys(params).length > 0 
           ? `${url}?${new URLSearchParams(params).toString()}`
           : url;
-        console.log(`[API GET] [${i + 1}/${uniqueVariations.length}] Trying: ${fullUrl}`);
-        console.log(`[API GET] Endpoint: ${endpointVar}`);
-        console.log(`[API GET] Headers: Authorization=${this.apiKey.substring(0, 30)}...`);
+        // Reduce logging for deliverables endpoints (404 is normal = no stock)
+        const isDeliverablesEndpoint = endpointVar.includes('deliverables');
+        if (!isDeliverablesEndpoint) {
+          console.log(`[API GET] [${i + 1}/${uniqueVariations.length}] Trying: ${fullUrl}`);
+          console.log(`[API GET] Endpoint: ${endpointVar}`);
+        }
         
         const response = await axios.get(url, {
           headers: { 
@@ -225,25 +228,31 @@ export class Api {
           validateStatus: (status) => status < 500 // Don't throw on 4xx, we'll handle it
         });
 
-        console.log(`[API GET] Response status: ${response.status}`);
-        console.log(`[API GET] Response content-type: ${response.headers['content-type'] || 'unknown'}`);
-        console.log(`[API GET] Response size: ${JSON.stringify(response.data || '').length} bytes`);
+        // Reduce logging for deliverables (404 is normal = no stock)
+        if (!isDeliverablesEndpoint) {
+          console.log(`[API GET] Response status: ${response.status}`);
+          console.log(`[API GET] Response content-type: ${response.headers['content-type'] || 'unknown'}`);
+        }
         
-        // Log response data structure
-        if (response.data) {
+        // Log response data structure (only for non-deliverables or successful responses)
+        if (response.data && (!isDeliverablesEndpoint || response.status === 200)) {
           const dataType = Array.isArray(response.data) ? 'array' : typeof response.data;
           const dataKeys = response.data && typeof response.data === 'object' && !Array.isArray(response.data) 
             ? Object.keys(response.data).join(', ') 
             : 'N/A';
-          console.log(`[API GET] Response data type: ${dataType}`);
-          if (dataKeys !== 'N/A') {
-            console.log(`[API GET] Response data keys: ${dataKeys}`);
+          if (!isDeliverablesEndpoint) {
+            console.log(`[API GET] Response data type: ${dataType}`);
+            if (dataKeys !== 'N/A') {
+              console.log(`[API GET] Response data keys: ${dataKeys}`);
+            }
           }
           
-          // If it's HTML (404 page), log first 200 chars
+          // If it's HTML (404 page), only log for non-deliverables
           if (typeof response.data === 'string' && response.data.includes('<!DOCTYPE')) {
-            console.log(`[API GET] ⚠️  Received HTML response (404 page): ${response.data.substring(0, 200)}...`);
-          } else if (response.data && typeof response.data === 'object') {
+            if (!isDeliverablesEndpoint) {
+              console.log(`[API GET] ⚠️  Received HTML response (404 page)`);
+            }
+          } else if (response.data && typeof response.data === 'object' && !isDeliverablesEndpoint) {
             console.log(`[API GET] Response preview:`, JSON.stringify(response.data, null, 2).substring(0, 800));
           }
         }
@@ -270,16 +279,12 @@ export class Api {
       return response.data;
         }
 
-        // If 404, try next variation
+        // If 404, handle silently for deliverables (normal = no stock), log for others
         if (response.status === 404) {
-          console.log(`[API GET] ❌ 404 Not Found`);
-          if (response.data) {
-            const errorPreview = typeof response.data === 'string' 
-              ? response.data.substring(0, 200) 
-              : JSON.stringify(response.data, null, 2).substring(0, 200);
-            console.log(`[API GET] 404 Response preview: ${errorPreview}...`);
+          if (!isDeliverablesEndpoint) {
+            console.log(`[API GET] ❌ 404 Not Found`);
+            console.log(`[API GET] ⏭️  Trying next variation...`);
           }
-          console.log(`[API GET] ⏭️  Trying next variation...`);
           lastError = { status: 404, data: response.data, message: 'Not found' };
           continue;
         }
