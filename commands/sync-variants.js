@@ -29,29 +29,52 @@ export default {
     // CRITICAL: Check and clean old SellAuth data from cache
     const oldData = loadVariantsData();
     if (Object.keys(oldData).length > 0) {
+      console.log(`[SYNC] 📋 Checking cache for old SellAuth data (${Object.keys(oldData).length} products in cache)...`);
+      
       // Check if data looks like SellAuth (has numeric IDs instead of UUIDs, or old structure)
       const firstProduct = Object.values(oldData)[0];
       if (firstProduct) {
         const productId = firstProduct.productId;
-        // SellHub uses UUIDs (strings with dashes), SellAuth might use numbers
-        // Also check if shop ID matches
+        // SellHub uses UUIDs (strings with dashes like "cf2c7cd5-c4c9-4c20-b9e2-bd861711c784")
+        // SellAuth might use numeric IDs or shorter strings without dashes
         const isOldData = typeof productId === 'number' || 
-                         (typeof productId === 'string' && !productId.includes('-') && productId.length < 10);
+                         (typeof productId === 'string' && 
+                          (!productId.includes('-') || productId.length < 30));
         
         if (isOldData) {
-          console.log('[SYNC] ⚠️  Detected old SellAuth data in cache - will be overwritten with SellHub data');
-          // Delete old cache file
+          console.log(`[SYNC] ⚠️  Detected old SellAuth data in cache (productId: ${productId} - not a UUID)`);
+          console.log(`[SYNC] 🗑️  Deleting old cache file to force fresh sync from SellHub...`);
           try {
             if (existsSync(variantsDataPath)) {
-              const { unlinkSync } = await import('fs');
               unlinkSync(variantsDataPath);
-              console.log('[SYNC] ✅ Deleted old SellAuth cache file');
+              console.log(`[SYNC] ✅ Deleted old SellAuth cache file`);
             }
           } catch (e) {
-            console.error('[SYNC] Error deleting old cache:', e.message);
+            console.error(`[SYNC] Error deleting old cache:`, e.message);
+          }
+        } else {
+          // Verify shop ID matches current configuration
+          const productIds = Object.values(oldData).map(p => p.productId?.toString() || '');
+          const hasMatchingShopId = productIds.some(id => id.startsWith(api.shopId?.substring(0, 8) || ''));
+          
+          if (!hasMatchingShopId && api.shopId) {
+            console.log(`[SYNC] ⚠️  Cache data doesn't match current shop ID (${api.shopId})`);
+            console.log(`[SYNC] 🗑️  Deleting cache to force fresh sync...`);
+            try {
+              if (existsSync(variantsDataPath)) {
+                unlinkSync(variantsDataPath);
+                console.log(`[SYNC] ✅ Deleted mismatched cache file`);
+              }
+            } catch (e) {
+              console.error(`[SYNC] Error deleting cache:`, e.message);
+            }
+          } else {
+            console.log(`[SYNC] ✅ Cache data looks valid (SellHub UUIDs detected)`);
           }
         }
       }
+    } else {
+      console.log(`[SYNC] 📋 No cache data found - will create fresh sync`);
     }
     
     // CRITICAL: Defer reply IMMEDIATELY to prevent timeout (3 second limit)
