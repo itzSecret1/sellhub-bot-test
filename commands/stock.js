@@ -12,13 +12,18 @@ async function getVariantRealItems(api, productId, variantId) {
   try {
     console.log(`[STOCK] Fetching items for product ${productId}, variant ${variantId}`);
 
-    const endpoint = `shops/${api.shopId}/products/${productId}/deliverables/${variantId}`;
+    // Use products/{productId}/deliverables/{variantId} (without shop ID - more reliable)
+    const endpoint = `products/${productId}/deliverables/${variantId}`;
     const response = await api.get(endpoint);
     const items = parseDeliverables(response);
 
     console.log(`[STOCK] API returned ${items.length} items`);
     return items;
   } catch (e) {
+    // 404 is normal when there's no stock
+    if (e.status === 404) {
+      return [];
+    }
     console.error(`[STOCK] Error fetching items:`, e.message);
     return [];
   }

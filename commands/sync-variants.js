@@ -359,33 +359,6 @@ export default {
           // Other errors = no stock (fail silently)
           return [];
         }
-        try {
-          const shopId = await api.getShopId();
-          const productEndpoint = shopId ? `shops/${shopId}/products/${productId}` : `products/${productId}`;
-          const productData = await api.get(productEndpoint);
-          if (productData) {
-            // Check if product has variants with stock info
-            const product = Array.isArray(productData) ? productData[0] : 
-                          (productData?.data?.products?.[0] || productData?.data || productData);
-            
-            if (product?.variants && Array.isArray(product.variants)) {
-              const variant = product.variants.find(v => 
-                (v.id && v.id.toString() === variantId) || 
-                (typeof v === 'string' && v === variantId)
-              );
-              
-              if (variant && typeof variant === 'object' && variant.stock !== undefined) {
-                // Stock is in variant object, but we need actual items count
-                // Return empty array to indicate we need to fetch from deliverables
-                return [];
-              }
-            }
-          }
-        } catch (e) {
-          // Ignore errors when fetching product
-        }
-        
-        return null;
       }
       
       for (let i = 0; i < variantsToFetchStock.length; i++) {

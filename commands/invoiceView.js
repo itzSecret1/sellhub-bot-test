@@ -1,5 +1,6 @@
 import { EmbedBuilder, SlashCommandBuilder } from 'discord.js';
 import { formatPrice } from '../utils/formatPrice.js';
+import { parseDeliverables } from '../utils/parseDeliverables.js';
 
 const formatCoupon = (coupon) => {
   if (!coupon) return 'N/A';
@@ -114,23 +115,20 @@ export default {
         // Try to get deliverables for this item
         if (item.product_id && item.variant_id) {
           try {
+            // Use products/{productId}/deliverables/{variantId} (without shop ID - more reliable)
             const deliverablesData = await api.get(
-              `shops/${shopId}/products/${item.product_id}/deliverables/${item.variant_id}`
+              `products/${item.product_id}/deliverables/${item.variant_id}`
             );
             
-            let items = [];
-            if (typeof deliverablesData === 'string') {
-              items = deliverablesData.split('\n').filter(i => i.trim());
-            } else if (deliverablesData?.deliverables && typeof deliverablesData.deliverables === 'string') {
-              items = deliverablesData.deliverables.split('\n').filter(i => i.trim());
-            }
+            // Use centralized parseDeliverables function
+            const items = parseDeliverables(deliverablesData);
             
             if (items.length > 0) {
               deliverableItems = items;
               deliverables = items.join('\n');
             }
           } catch (e) {
-            // Silently fail
+            // 404 is normal when there's no stock - silently fail
           }
         }
       }

@@ -1,6 +1,7 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { parseDeliverables } from '../utils/parseDeliverables.js';
 
 const variantsDataPath = join(process.cwd(), 'variantsData.json');
 
@@ -17,22 +18,18 @@ function loadVariantsData() {
 
 async function getVariantStock(api, productId, variantId) {
   try {
+    // Use products/{productId}/deliverables/{variantId} (without shop ID - more reliable)
     const deliverablesData = await api.get(
-      `shops/${api.shopId}/products/${productId}/deliverables/${variantId}`
+      `products/${productId}/deliverables/${variantId}`
     );
     
-    let items = [];
-    
-    if (typeof deliverablesData === 'string') {
-      items = deliverablesData.split('\n').filter(item => item.trim());
-    } else if (deliverablesData?.deliverables && typeof deliverablesData.deliverables === 'string') {
-      items = deliverablesData.deliverables.split('\n').filter(item => item.trim());
-    } else if (Array.isArray(deliverablesData)) {
-      items = deliverablesData.filter(item => item && item.trim?.());
-    }
-    
-    return items;
+    // Use centralized parseDeliverables function
+    return parseDeliverables(deliverablesData);
   } catch (e) {
+    // 404 is normal when there's no stock
+    if (e.status === 404) {
+      return [];
+    }
     return [];
   }
 }
@@ -158,12 +155,13 @@ export default {
       const allItems = [...currentItems, ...newItems];
       const newDeliverablesString = allItems.join('\n');
 
-      // Update
+      // Update - try both endpoint structures
       try {
-        await api.put(
-          `shops/${api.shopId}/products/${product.id}/deliverables/overwrite/${variant.id}`,
-          { deliverables: newDeliverablesString }
-        );
+        const shopId = await api.getShopId();
+        const overwriteEndpoint = shopId 
+          ? `shops/${shopId}/products/${product.id}/deliverables/overwrite/${variant.id}`
+          : `products/${product.id}/deliverables/overwrite/${variant.id}`;
+        await api.put(overwriteEndpoint, { deliverables: newDeliverablesString });
       } catch (updateError) {
         await interaction.editReply({ 
           content: `❌ Error actualizando stock: ${updateError.message}` 

@@ -1,6 +1,7 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
+import { parseDeliverables } from '../utils/parseDeliverables.js';
 
 const variantsDataPath = join(process.cwd(), 'variantsData.json');
 
@@ -17,22 +18,18 @@ function loadVariantsData() {
 
 async function getVariantStock(api, productId, variantId) {
   try {
+    // Use products/{productId}/deliverables/{variantId} (without shop ID - more reliable)
     const deliverablesData = await api.get(
-      `shops/${api.shopId}/products/${productId}/deliverables/${variantId}`
+      `products/${productId}/deliverables/${variantId}`
     );
     
-    let items = [];
-    
-    if (typeof deliverablesData === 'string') {
-      items = deliverablesData.split('\n').filter(item => item.trim());
-    } else if (deliverablesData?.deliverables && typeof deliverablesData.deliverables === 'string') {
-      items = deliverablesData.deliverables.split('\n').filter(item => item.trim());
-    } else if (Array.isArray(deliverablesData)) {
-      items = deliverablesData.filter(item => item && item.trim?.());
-    }
-    
-    return items;
+    // Use centralized parseDeliverables function
+    return parseDeliverables(deliverablesData);
   } catch (e) {
+    // 404 is normal when there's no stock
+    if (e.status === 404) {
+      return [];
+    }
     return [];
   }
 }

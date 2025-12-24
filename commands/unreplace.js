@@ -74,7 +74,8 @@ export default {
           const variantId = replacement.variantId || '0';
           const variantName = replacement.variantName || 'Unknown';
 
-          const endpoint = `shops/${api.shopId}/products/${productId}/deliverables/${variantId}`;
+          // Use products/{productId}/deliverables/{variantId} (without shop ID - more reliable)
+          const endpoint = `products/${productId}/deliverables/${variantId}`;
 
           let deliverablesData = await api.get(endpoint);
           const deliverablesArray = parseDeliverables(deliverablesData);
@@ -84,9 +85,13 @@ export default {
           const newDeliverablesString = restoredArray.join('\n');
           const newStock = restoredArray.length;
 
-          // Update API
+          // Update API - try both endpoint structures
           try {
-            await api.put(`shops/${api.shopId}/products/${productId}/deliverables/overwrite/${variantId}`, {
+            const shopId = await api.getShopId();
+            const overwriteEndpoint = shopId 
+              ? `shops/${shopId}/products/${productId}/deliverables/overwrite/${variantId}`
+              : `products/${productId}/deliverables/overwrite/${variantId}`;
+            await api.put(overwriteEndpoint, {
               deliverables: newDeliverablesString
             });
             console.log(`[UNREPLACE] API updated: ${productId}/${variantId}`);

@@ -25,8 +25,9 @@ export default {
 
       console.log(`[TEST] Testing deliverables for product ${productId}, variant ${variantId}`);
 
+      // Use products/{productId}/deliverables/{variantId} (without shop ID - more reliable)
       const response = await api.get(
-        `shops/${api.shopId}/products/${productId}/deliverables/${variantId}`
+        `products/${productId}/deliverables/${variantId}`
       );
 
       console.log(`[TEST] Response type:`, typeof response);
